@@ -1,0 +1,12 @@
+{
+  "file_path": "D:\\UNIVERSITA\\KTH\\Semestre 1\\Project Course in Data Science\\CODE\\data\\video_4DLC_resnet101_For_Video_October14Oct14shuffle1_111600.csv",
+  "input_size": 10,
+  "hidden_size": 200,
+  "num_layers": 5,
+  "threshold": 0.2,
+  "sequence_length": 120,
+  "lr": 5e-4,
+  "train": "True",
+  "batch_size": 32,
+  "n_epochs": 200
+}
