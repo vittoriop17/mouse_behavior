@@ -1,0 +1,6 @@
+checkpoint.pt
+*.txt
+*.csv
+*.avi
+.idea
+.pytest_cache
