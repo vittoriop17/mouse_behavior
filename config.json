@@ -1,12 +1,20 @@
 {
   "file_path": "D:\\UNIVERSITA\\KTH\\Semestre 1\\Project Course in Data Science\\CODE\\data\\video_4DLC_resnet101_For_Video_October14Oct14shuffle1_111600.csv",
   "input_size": 10,
-  "hidden_size": 200,
-  "num_layers": 5,
+  "hidden_size": 100,
+  "num_layers": 1,
   "threshold": 0.2,
   "sequence_length": 120,
+  "stride": 60,
   "lr": 5e-4,
-  "train": "True",
   "batch_size": 32,
-  "n_epochs": 200
+  "n_epochs": 200,
+  "train_dataset_path": "D:\\UNIVERSITA\\KTH\\Semestre 1\\Project Course in Data Science\\CODE\\train_dataset.csv",
+  "test_dataset_path": "D:\\UNIVERSITA\\KTH\\Semestre 1\\Project Course in Data Science\\CODE\\test_dataset.csv",
+  "n_behaviors": 3,
+  "n_markers": 8,
+  "dropout": 0.2,
+  "encoder_input_size": 24,
+  "train": "True",
+  "device": "cpu"
 }
