@@ -3,9 +3,11 @@ import json
 import os
 import cv2
 import numpy as np
+import h5py
+import torch
 
 
-def upload_args():
+def upload_args(file_path="config.json"):
     parser = argparse.ArgumentParser(description=f'Arguments from json')
     parser.add_argument("--n_epochs", required=False, type=int, help="Number of epochs")
     parser.add_argument("--input_size", required=False, type=int, help="Input size of a singular time sample")
@@ -17,12 +19,12 @@ def upload_args():
     parser.add_argument("--train", required=False, type=bool)
     parser.add_argument("--video", required=False, type=str, help="Video path. Video used for evaluation of results")
     args = parser.parse_args()
-    args = upload_args_from_json(args)
+    args = upload_args_from_json(args, file_path)
     print(args)
     return args
 
 
-def upload_args_from_json(args, file_path=os.path.join("config.json")):
+def upload_args_from_json(args, file_path="config.json"):
     if args is None:
         parser = argparse.ArgumentParser(description=f'Arguments from json')
         args = parser.parse_args()
@@ -55,6 +57,13 @@ def get_frames_from_video(video_path: str):
         frames.append(image) if success else None
     return np.array(frames)
 
+
+def save_frames(root_path, frames):
+    for idx, frame in frames:
+        frame_path = os.path.join(root_path, f"{idx}.png")
+        cv2.imwrite(frame_path, frame, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+
+
 def print_dots_on_frames(frames, coords: np.array):
     """
     :param frames: np.array containing the frames extracted from the video (result returned by get_frames_from_video)
@@ -78,6 +87,7 @@ def print_dots_on_frames(frames, coords: np.array):
             y = int(np.round(coords[frame_id][id_y]))
             frames[frame_id] = cv2.circle(frames[frame_id], (x, y), radius, (B, G, R), thickness)
     return frames
+
 
 def build_video(frames):
     """
@@ -104,3 +114,28 @@ def mark_video_with_dots(video_path, coords_path):
     coords = np.loadtxt(coords_path, delimiter=',', skiprows=0)
     frames = print_dots_on_frames(frames, coords)
     build_video(frames)
+
+
+def load_existing_model(model, optimizer, checkpoint_path):
+    try:
+        print(f"Trying to load existing model from checkpoint @ {checkpoint_path}...")
+        checkpoint = torch.load(checkpoint_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        print("...existing model loaded")
+        max_test_f1_score = getattr(checkpoint, "max_test_f1_score", 0)
+        epoch = getattr(checkpoint, "epoch", 0)
+    except Exception as e:
+        print("...loading failed")
+        print(f"During loading the existing model, the following exception occured: \n{e}")
+        print("The execution will continue anyway")
+        max_test_f1_score = 0
+        epoch = 0
+    return max_test_f1_score, epoch
+
+
+if __name__=='__main__':
+    file_path = "..\\data\\DLC_resnet101_groomOct29shuffle1_117500-snapshot-117500.h5"
+    video_path = "..\\..\\ALL_VIDEOSSSS\\final\\front_57min.MP4"
+    frames = get_frames_from_video(video_path=video_path)
+    save_frames(root_path="..\\data\\frames_video_57min")

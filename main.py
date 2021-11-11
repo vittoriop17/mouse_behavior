@@ -1,7 +1,7 @@
 import torch
 from utils import utils
-from model import train_test, new_lstm
-from utils import data_loader, dataset
+from model import new_lstm
+from utils import dataset, train
 import numpy as np
 import pandas as pd
 
@@ -52,29 +52,30 @@ def generate_sequence_idx(frame_id, sequence_length, tot_sequences):
 
 
 def main(params):
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    setattr(params, "device", device)
-    print("Using {} device".format(device))
-    train_dl, test_dl = data_loader.train_test_dataloader(params)
-    model, history = train_test.train_model(train_dl, test_dl, params=params)
-    torch.save(model.state_dict(), "checkpoint.pt")
-    # setattr(params, "file_path", "train_dataset.csv")
-    # train_dataset = dataset.MarkersDataset(params, train=True)
-    # setattr(params, "file_path", "test_dataset.csv")
-    # mean, std = train_dataset.get_stats()
-    # test_dataset = dataset.MarkersDataset(params, train=False, mean=mean, std=std)
-    # cols_coords = train_dataset.cols_coords
-    # train_pred = model(train_dataset.input_dataset.to(device))
-    # train_pred = (train_pred.detach().cpu().numpy() * std[cols_coords]) + mean[cols_coords]
-    # test_pred = model(test_dataset.input_dataset.to(device))
-    # test_pred = (test_pred.detach().cpu().numpy() * std[cols_coords]) + mean[cols_coords]
-    # save_trajectories(train_dataset, test_dataset, train_pred, test_pred, params)
-
-    # print video
-    frames = utils.get_frames_from_video("groom1_edited.avi")
-    coords = np.loadtxt("final_pred.csv", delimiter=',', skiprows=0)[:, 1:]
-    utils.print_dots_on_frames(frames, coords)
-    utils.build_video(frames)
+    train.train_wrapper(params)
+    # device = 'cuda' if torch.cuda.is_available() else 'cpu'
+    # setattr(params, "device", device)
+    # print("Using {} device".format(device))
+    # train_dl, test_dl = data_loader.train_test_dataloader(params)
+    # model, history = train_test.train_model(train_dl, test_dl, args=params)
+    # torch.save(model.state_dict(), "checkpoint.pt")
+    # # setattr(params, "file_path", "train_dataset.csv")
+    # # train_dataset = dataset.MarkersDataset(params, train=True)
+    # # setattr(params, "file_path", "test_dataset.csv")
+    # # mean, std = train_dataset.get_stats()
+    # # test_dataset = dataset.MarkersDataset(params, train=False, mean=mean, std=std)
+    # # cols_coords = train_dataset.cols_coords
+    # # train_pred = model(train_dataset.input_dataset.to(device))
+    # # train_pred = (train_pred.detach().cpu().numpy() * std[cols_coords]) + mean[cols_coords]
+    # # test_pred = model(test_dataset.input_dataset.to(device))
+    # # test_pred = (test_pred.detach().cpu().numpy() * std[cols_coords]) + mean[cols_coords]
+    # # save_trajectories(train_dataset, test_dataset, train_pred, test_pred, params)
+    #
+    # # print video
+    # frames = utils.get_frames_from_video("groom1_edited.avi")
+    # coords = np.loadtxt("final_pred.csv", delimiter=',', skiprows=0)[:, 1:]
+    # utils.print_dots_on_frames(frames, coords)
+    # utils.build_video(frames)
 
 if __name__ == '__main__':
     args = utils.upload_args()
