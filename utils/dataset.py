@@ -10,47 +10,91 @@ import cv2
 import utils
 
 
+def check_start_end(start_end):
+    flags = None
+    for idx, (start, end) in enumerate(start_end):
+        start, end = int(start), int(end)
+        if start >= end:
+            raise ValueError("Inconsistent relation. start_frame must be < than end_frame")
+        if idx == 0:
+            flags = np.zeros((end-start, 1), dtype=int)
+            continue
+        flags[start:end] += 1
+        if np.max(flags) > 1:
+            raise ValueError(f"Wrong interval! The current interval {start}-{end} is overlapped with an existing interval")
+
+
 def merge_behavior_and_trajectories(file_behavior,
                                     file_trajectories,
-                                    save_video=False,
-                                    frames_path="..\\data\\frames_video_57min"):
+                                    save_custom_frames=False,
+                                    frames_path="..\\data\\frames_video_57min",
+                                    video_path="..\\..\\ALL_VIDEOSSSS\\final\\front_57min.MP4",
+                                    merge=False):
     """
-    File_behavior format:
-        class_id, start_frame, end_frame
-    where
-        -class_id can be: 0 or 1 (0 for grooming, 1 for climbing)
-        -start_frame: absolute value of the frame where the associated behavior starts
-        -end_frame: absolute value of the frame where the associated behavior ends
-    Note that there is no need to specify 'general' behavior. We suppose that's the common condition, when the mouse
-    is not grooming, neither climbing.
+    N.B: file_behavior, file_trajectories and video_path are somehow related to each other. In particular,
+    they must be referred to the same video (which should be the one represented by video_path)
+    File_trajectories must contain the column 'FRAME_ID': this can start from whatever number
+    (e.g.: for test dataset, this should start from a number different from 0).
+    Obv, the data inside file_behavior must be consistent with the frame_id inside file_trajectories
+    :param video_path: str. Path to the video. This is used for extracting custom frames (if save_custom_frames=True)
+    :param merge: boolean, default: False. Merge existing labels in existing TRAJECTORY DATAFRAME
+    :param frames_path: str. Path to the folder that will contain the frames extracted for evaluation.
+    :param save_custom_frames: boolean, default: False. Save the frames with a MARKER on them. Save only the
+        frames associated to start_frame and end_frame reported in the file_behavior
+    :param file_behavior: str to the .csv file representing the behavior formatted in the following way:
+        format:
+            class_id, start_frame, end_frame
+        where
+            -class_id can be: 0 or 1 (0 for grooming, 1 for climbing)
+            -start_frame: absolute value of the frame where the associated behavior starts
+            -end_frame: absolute value of the frame where the associated behavior ends
+        Note that there is no need to specify 'general' behavior. We suppose that's the common condition, when the mouse
+        is not grooming, neither climbing.
+    :param file_trajectories: str to the .csv file representing the trajectories.
+        format: (see train_dataset.csv and test_dataset.csv for instance)
 
-    File_trajectories format: (see train_dataset.csv and test_dataset.csv for instance)
-
-    PLEASE NOTE:
-        the numeration between trajectory frames and behavior frames must be meaningful!!!!
-        Be sure that the behaviors and the trajectories are correctly linked together
+        PLEASE NOTE:
+            the numeration between trajectory frames and behavior frames must be meaningful!!!!
+            Be sure that the behaviors and the trajectories are correctly linked together
     :return:
     """
     df_trajectories = pd.read_csv(file_trajectories)
     num_frames = df_trajectories.shape[0]
     behavior_start_end = np.loadtxt(file_behavior, delimiter=",", skiprows=1)
+    check_start_end(behavior_start_end[:, 1:])
     behavior_classes = {0: "grooming", 1: "climbing", 2: "general"}
     # by default, all behaviors are set to 0
-    behavior_by_frame = 2 + np.zeros((num_frames, 1))
-    for row in behavior_start_end.iterrow():
+    behavior_by_frame = 2 + np.zeros((num_frames, 1)) if not merge else df_trajectories.label.to_numpy()
+    for idx, row in enumerate(behavior_start_end):
         behavior, start_frame, end_frame = row
+        start_frame, end_frame = int(start_frame), int(end_frame)
+        if behavior == -1 and idx == 0:
+            if df_trajectories.frame_id.min() > start_frame or df_trajectories.frame_id.max() < end_frame:
+                raise ValueError("Start or end frame not valid. Trajectory dataframe has different boundaries for frame_id")
+            # pandas indexing works differently. It takes also the last element with index end_frame-1
+            pre_mask = df_trajectories.frame_id >= start_frame
+            post_mask = df_trajectories.frame_id < end_frame
+            df_trajectories = df_trajectories[pre_mask & post_mask]
+            behavior_by_frame = behavior_by_frame[start_frame:end_frame]
+            continue
         if behavior not in behavior_classes.keys():
-            raise ValueError(f'Invalid behavior found! Expected one of {behavior_classes.keys()}, found {behavior} instead')
+            raise ValueError(
+                f'Invalid behavior found! Expected one of {behavior_classes.keys()}, found {behavior} instead')
         behavior_by_frame[start_frame:end_frame] = behavior
+        if save_custom_frames and os.path.exists(frames_path):
+            # save only two frames (the first and the last one associated to the behavior)
+            for frame_number in [start_frame, end_frame]:
+                utils.save_ith_frames_from_video(video_name=video_path, root_path=frames_path, frame_seq=frame_number)
+                frame_path = os.path.join(frames_path, f"{frame_number}.png")
+                img = cv2.imread(frame_path)
+                # write dot on top of img
+                RGB = (255, 0, 0) if behavior == 0 else ((0, 255, 0) if behavior == 1 else (0, 0, 0))
+                img = utils.print_dots_on_frames(img, (0, 0), RGB=RGB)
+                cv2.imwrite(frame_path, img, [cv2.IMWRITE_PNG_COMPRESSION, 9])
 
-    for frame_id, behavior in behavior_by_frame:
-        if save_video:
-            frame_path = os.path.join(frames_path, f"{frame_id}.png")
-            img = cv2.imread(frame_path)
-            # write dot on top of img
-            cv2.imwrite(frame_path, img, [cv2.IMWRITE_PNG_COMPRESSION, 9])
     df_traj_n_label = pd.concat([df_trajectories,
-                                 pd.DataFrame(behavior_classes, columns=["label"])], axis=1)
+                                 pd.DataFrame(behavior_by_frame, columns=["label"], index=df_trajectories.index)],
+                                axis=1)
     df_traj_n_label.to_csv("final_dataset.csv", index=False)
 
 
@@ -119,14 +163,14 @@ class MarkersDataset(Dataset):
         self.target_dataset = None
         self.n_sequences = None
         self.with_likelihood = True
-        self.train = args.train
+        self.train = train
         self.mean = mean
         self.std = std
         self.check_args(args)
         self.device = args.device
         self.seq_length = args.sequence_length  # represents the number of frames in a single sequence
         self.stride = args.stride  # represents the stride between two consecutive sequences
-        self.dataset_path = args.train_dataset_path if train else args.test_dataset_path
+        self.dataset_path = args.train_dataset_path if self.train else args.test_dataset_path
         self.transform = StandardScaler(with_std=True, with_mean=True) if train else None
         if not os.path.isfile(self.dataset_path):
             raise FileNotFoundError(f"{self.dataset_path} does not exist!")
@@ -335,5 +379,8 @@ class MarkersDataset(Dataset):
 if __name__ == '__main__':
     args = utils.upload_args("..\\config.json")
     # split_dataset("..\\data\\video_4DLC_resnet101_For_Video_October14Oct14shuffle1_111600.csv")
-    ds = MarkersDataset(args)
-    breakpoint()
+    # ds = MarkersDataset(args)
+    # breakpoint()
+    file_behavior = "..\\behavior_labels.csv"
+    file_trajectories = "..\\train_dataset.csv"
+    merge_behavior_and_trajectories(file_behavior, file_trajectories)

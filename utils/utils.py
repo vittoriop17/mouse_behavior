@@ -58,13 +58,47 @@ def get_frames_from_video(video_path: str):
     return np.array(frames)
 
 
-def save_frames(root_path, frames):
-    for idx, frame in frames:
-        frame_path = os.path.join(root_path, f"{idx}.png")
-        cv2.imwrite(frame_path, frame, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+def save_frames_from_video(video_path: str, root_path, skip_n_frames=0, idx=None):
+    try:
+        os.makedirs(root_path)
+    except:
+        pass
+    vidcap = cv2.VideoCapture(video_path)
+    count = 0
+    success, image = vidcap.read()
+    while success and (idx is not None or len(idx) > 0):
+        if skip_n_frames > count and idx is None:
+            success, image = vidcap.read()
+            count += 1
+            continue
+        elif idx is not None:
+            if count in idx:
+                idx.remove(count)
+                frame_path = os.path.join(root_path, f"{count}.png")
+                cv2.imwrite(frame_path, image, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+                success, image = vidcap.read()
+                count += 1
+            else:
+                success, image = vidcap.read()
+                count += 1
+        else:
+            frame_path = os.path.join(root_path, f"{count}.png")
+            cv2.imwrite(frame_path, image, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+            success, image = vidcap.read()
+            count += 1
 
 
-def print_dots_on_frames(frames, coords: np.array):
+def save_ith_frames_from_video(video_name: str, root_path, frame_seq):
+    # Open the video file
+    cap = cv2.VideoCapture(video_name)
+    cap.set(1, frame_seq)
+    # Read the next frame from the video
+    ret, frame = cap.read()
+    frame_path = os.path.join(root_path, f"{frame_seq}.png")
+    cv2.imwrite(frame_path, frame, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+
+
+def print_dots_on_frames(frames, coords: np.array, RGB=(0, 0, 255)):
     """
     :param frames: np.array containing the frames extracted from the video (result returned by get_frames_from_video)
     :param coords: 2-D numpy array. For each row, it contains a set of coordinates
@@ -75,7 +109,7 @@ def print_dots_on_frames(frames, coords: np.array):
     """
     radius = 5
     thickness = 5
-    B, G, R = 0, 0, 255
+    R, G, B = RGB
     n_points = int(coords.shape[1] / 2)
     if frames.shape[0] != coords.shape[0]:
         Warning("Number of frames differs from size of 'coords'")
@@ -134,8 +168,11 @@ def load_existing_model(model, optimizer, checkpoint_path):
     return max_test_f1_score, epoch
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     file_path = "..\\data\\DLC_resnet101_groomOct29shuffle1_117500-snapshot-117500.h5"
     video_path = "..\\..\\ALL_VIDEOSSSS\\final\\front_57min.MP4"
-    frames = get_frames_from_video(video_path=video_path)
-    save_frames(root_path="..\\data\\frames_video_57min")
+    root_path = "..\\data\\frames_video_22min"
+    # frames = get_frames_from_video(video_path=video_path)
+    # save_frames(root_path=, frames=frames)
+    # save_frames_from_video(video_path, root_path)
+    save_ith_frames_from_video(video_name=video_path, root_path=root_path, frame_seq=10721 * 2)
