@@ -36,16 +36,17 @@ def train_wrapper(args):
     model, history = train_model(model, optimizer, train_dataloader, test_dataloader, args, coord_cols=coord_cols)
 
 
-def collapse_predictions(batch_pred_behaviors, batch_frame_ids, accumulator):
+def collapse_predictions(batch_pred_behaviors: torch.tensor, batch_frame_ids, accumulator):
     """
     :param batch_pred_behaviors: tensor. Shape: (N, SEQ_LENGTH, 3)
     :param batch_frame_ids: tensor. Shape: (N, SEQ_LENGTH)
     :param accumulator: numpy array. Shape: (N_TOTAL_FRAMES, 3)
     :return:
     """
+    batch_pred_behaviors = batch_pred_behaviors.clone().cpu().detach().numpy()
     for batch_idx, seq_frame_ids in enumerate(batch_frame_ids):
         seq_frame_ids = seq_frame_ids.type(torch.int)
-        accumulator[seq_frame_ids, :] += batch_pred_behaviors[batch_idx].cpu().detach().numpy()
+        accumulator[seq_frame_ids, :] += batch_pred_behaviors[batch_idx]
     return accumulator
 
 def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord_cols, alpha=0.5):
