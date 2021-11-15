@@ -46,7 +46,7 @@ def collapse_predictions(batch_pred_behaviors: torch.tensor, batch_frame_ids, ac
     batch_pred_behaviors = batch_pred_behaviors.clone().cpu().detach().numpy()
     for batch_idx, seq_frame_ids in enumerate(batch_frame_ids):
         seq_frame_ids = seq_frame_ids.type(torch.int)
-        accumulator[seq_frame_ids, :] += batch_pred_behaviors[batch_idx]
+        accumulator[seq_frame_ids.cpu(), :] += batch_pred_behaviors[batch_idx]
     return accumulator
 
 def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord_cols, alpha=0.5):
