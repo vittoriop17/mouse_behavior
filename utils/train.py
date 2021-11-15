@@ -126,10 +126,10 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
         history['train_f1_score'].append(f1_score(train_true_behaviors, train_frame_pred_accumulator.argmax(axis=-1), average='micro'))
         history['test_f1_score'].append(f1_score(test_true_behaviors, test_frame_pred_accumulator.argmax(axis=-1), average='micro'))
         print(f"Epoch: {epoch}  \t(time: {te - ts} )\n"
-              f"\tCLASSIFICATION:\t train loss: {train_classification_loss}  "
+              f"\tCLASSIFICATION:\t\t train loss: {train_classification_loss}  "
               f"test loss: {test_classification_loss} \n"
-              f"\tCLASSIFICATION MICRO F1 score: \t train: {history['train_f1_score'][-1]}"
+              f"\tCLASSIFICATION MICRO F1 score: \t train: {history['train_f1_score'][-1]}  "
               f"test: {history['test_f1_score'][-1]}\n"
-              f"\tDENOISING:\t train loss: {train_denoising_loss}")
+              f"\tDENOISING:\t\t train loss: {train_denoising_loss}")
 
     return model.eval(), history
