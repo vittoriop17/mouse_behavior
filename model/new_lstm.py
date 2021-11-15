@@ -170,7 +170,7 @@ class Net(nn.Module):
                                          nn.ReLU(),
                                          nn.Linear(in_features=50, out_features=self.n_behaviors,
                                                    device=self.device),
-                                         nn.Softmax())
+                                         nn.LogSoftmax(dim=-1))
         self.decoder_denoising = nn.LSTMCell(input_size=self.dec_input_size, hidden_size=self.D*self.hidden_size,
                                              device=self.device)
         self.fc_denoising = nn.Sequential(nn.Linear(in_features=self.D*self.hidden_size, out_features=100,

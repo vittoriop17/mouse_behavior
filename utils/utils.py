@@ -98,7 +98,7 @@ def save_ith_frames_from_video(video_name: str, root_path, frame_seq):
     cv2.imwrite(frame_path, frame, [cv2.IMWRITE_PNG_COMPRESSION, 9])
 
 
-def print_dots_on_frames(frames, coords: np.array, RGB=(0, 0, 255)):
+def print_dots_on_frames(frames, coords: np.array, RGB=(0, 0, 255), radius=5, thickness=5):
     """
     :param frames: np.array containing the frames extracted from the video (result returned by get_frames_from_video)
     :param coords: 2-D numpy array. For each row, it contains a set of coordinates
@@ -107,8 +107,8 @@ def print_dots_on_frames(frames, coords: np.array, RGB=(0, 0, 255)):
         check file 'final_pred.csv' for a clearer example
     :return: np.array with frames marked with dots
     """
-    radius = 5
-    thickness = 5
+    radius = radius
+    thickness = thickness
     R, G, B = RGB
     n_points = int(coords.shape[1] / 2)
     if frames.shape[0] != coords.shape[0]:

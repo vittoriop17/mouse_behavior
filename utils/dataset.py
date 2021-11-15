@@ -10,26 +10,28 @@ import cv2
 import utils
 
 
-def check_start_end(start_end):
+def check_start_end(start_end, n_frames):
     flags = None
     for idx, (start, end) in enumerate(start_end):
         start, end = int(start), int(end)
-        if start >= end:
+        if start >= end and not (end == -1 and idx == 0):
             raise ValueError("Inconsistent relation. start_frame must be < than end_frame")
         if idx == 0:
-            flags = np.zeros((end-start, 1), dtype=int)
+            end = n_frames if end==-1 else end
+            flags = np.zeros((end - start, 1), dtype=int)
             continue
         flags[start:end] += 1
         if np.max(flags) > 1:
-            raise ValueError(f"Wrong interval! The current interval {start}-{end} is overlapped with an existing interval")
+            raise ValueError(
+                f"Wrong interval! The current interval {start}-{end} is overlapped with an existing interval")
 
 
 def merge_behavior_and_trajectories(file_behavior,
                                     file_trajectories,
                                     save_custom_frames=False,
-                                    frames_path="..\\data\\frames_video_57min",
-                                    video_path="..\\..\\ALL_VIDEOSSSS\\final\\front_57min.MP4",
-                                    merge=False):
+                                    frames_path="..\\data\\evaluation_frames_1h6min",
+                                    video_path="..\\..\\ALL_VIDEOSSSS\\S1740002.MP4",
+                                    merge=False, adjust_frame_id=True):
     """
     N.B: file_behavior, file_trajectories and video_path are somehow related to each other. In particular,
     they must be referred to the same video (which should be the one represented by video_path)
@@ -61,16 +63,23 @@ def merge_behavior_and_trajectories(file_behavior,
     df_trajectories = pd.read_csv(file_trajectories)
     num_frames = df_trajectories.shape[0]
     behavior_start_end = np.loadtxt(file_behavior, delimiter=",", skiprows=1)
-    check_start_end(behavior_start_end[:, 1:])
+    check_start_end(behavior_start_end[:, 1:], df_trajectories.frame_id.max())
     behavior_classes = {0: "grooming", 1: "climbing", 2: "general"}
     # by default, all behaviors are set to 0
     behavior_by_frame = 2 + np.zeros((num_frames, 1)) if not merge else df_trajectories.label.to_numpy()
     for idx, row in enumerate(behavior_start_end):
         behavior, start_frame, end_frame = row
         start_frame, end_frame = int(start_frame), int(end_frame)
+        if adjust_frame_id:
+            start_frame, end_frame = (start_frame * 2, end_frame * 2) if end_frame != -1 else (
+            start_frame * 2, end_frame)
         if behavior == -1 and idx == 0:
-            if df_trajectories.frame_id.min() > start_frame or df_trajectories.frame_id.max() < end_frame:
-                raise ValueError("Start or end frame not valid. Trajectory dataframe has different boundaries for frame_id")
+            end_frame = df_trajectories.frame_id.max()+1 if end_frame == -1 else end_frame
+            if df_trajectories.frame_id.min() > start_frame or df_trajectories.frame_id.max() < end_frame-1:
+                raise ValueError("Start or end frame not valid. Trajectory dataframe has different boundaries "
+                                 f"for frame_id. \nTrajectory frame ids "
+                                 f"({df_trajectories.frame_id.min()}, {df_trajectories.frame_id.max()})\n"
+                                 f"Behavior frame ids ({start_frame}, {end_frame})")
             # pandas indexing works differently. It takes also the last element with index end_frame-1
             pre_mask = df_trajectories.frame_id >= start_frame
             post_mask = df_trajectories.frame_id < end_frame
@@ -80,6 +89,11 @@ def merge_behavior_and_trajectories(file_behavior,
         if behavior not in behavior_classes.keys():
             raise ValueError(
                 f'Invalid behavior found! Expected one of {behavior_classes.keys()}, found {behavior} instead')
+        if start_frame >= num_frames:
+            print("There is no trajectory information associated to the specified frame number. "
+                  f"Thus, the behavior label must be discarded! {start_frame} > {num_frames}, where"
+                  f"{num_frames} is the total number of frame trajectories inside the trajectory file")
+            continue
         behavior_by_frame[start_frame:end_frame] = behavior
         if save_custom_frames and os.path.exists(frames_path):
             # save only two frames (the first and the last one associated to the behavior)
@@ -89,13 +103,14 @@ def merge_behavior_and_trajectories(file_behavior,
                 img = cv2.imread(frame_path)
                 # write dot on top of img
                 RGB = (255, 0, 0) if behavior == 0 else ((0, 255, 0) if behavior == 1 else (0, 0, 0))
-                img = utils.print_dots_on_frames(img, (0, 0), RGB=RGB)
-                cv2.imwrite(frame_path, img, [cv2.IMWRITE_PNG_COMPRESSION, 9])
+                img = utils.print_dots_on_frames(img.reshape(-1, *img.shape), np.array([[0, 0]]), RGB=RGB, radius=30,
+                                                 thickness=30)
+                cv2.imwrite(frame_path, img.squeeze(), [cv2.IMWRITE_PNG_COMPRESSION, 9])
 
     df_traj_n_label = pd.concat([df_trajectories,
                                  pd.DataFrame(behavior_by_frame, columns=["label"], index=df_trajectories.index)],
                                 axis=1)
-    df_traj_n_label.to_csv("final_dataset.csv", index=False)
+    df_traj_n_label.to_csv(str.replace(file_trajectories, ".csv", "_w_behaviors.csv"), index=False)
 
 
 def check_params_for_sequence(in_size, kernel, stride):
@@ -146,8 +161,8 @@ def split_dataset(file_path, train_size=0.8):
     n_train_sample = int(train_size * dataset.shape[0])
     dataset.index.name = "frame_id"
     columns = dataset.columns
-    dataset[:n_train_sample].to_csv(path_or_buf="..\\train_dataset.csv", header=columns, index=True)
-    dataset[n_train_sample:].to_csv(path_or_buf="..\\test_dataset.csv", header=columns, index=True)
+    dataset[:n_train_sample].to_csv(path_or_buf="..\\data\\train_dataset.csv", header=columns, index=True)
+    dataset[n_train_sample:].to_csv(path_or_buf="..\\data\\test_dataset.csv", header=columns, index=True)
 
 
 class MarkersDataset(Dataset):
@@ -184,16 +199,20 @@ class MarkersDataset(Dataset):
         if self.with_likelihood:
             # remember, the shape of input_dataset is [N_SEQUENCES, SEQ_LENGTH, INPUT_SIZE+1]
             # where the +1 represents the frame_id metadata
-            seq_frame_ids = torch.tensor(self.input_dataset[idx, :, 0], device=self.device)
-            sequence = torch.tensor(self.input_dataset[idx, :, 1:], device=self.device)
-            likelihoods = torch.tensor(self.input_dataset[idx, :, self.cols_likelihood], device=self.device)
-            classes = torch.tensor(self.input_dataset[idx, :, self.col_class], device=self.device)
+            seq_frame_ids = self.input_dataset[idx, :, 0].clone().detach()
+            sequence_w_likeli = self.input_dataset[idx, :, self.cols_coords + self.cols_likelihood].clone().detach()
+            likelihoods = self.input_dataset[idx, :, self.cols_likelihood].clone().detach()
+            classes = self.input_dataset[idx, :, self.col_class].clone().detach()
             # shapes:
             # seq_frame_ids: [SEQ_LENGTH, 1]
-            # sequence: [SEQ_LENGTH, INPUT_SIZE]
+            # sequence_w_likeli: [SEQ_LENGTH, INPUT_SIZE]
             # likelihoods: [SEQ_LENGTH, n_markers]   --->   n_markers=input_size/3 (input: x,y,L for each marker)
             # classes: [SEQ_LENGTH, 1]
-            return seq_frame_ids, sequence, likelihoods, classes
+            classes = classes.type(torch.long).to(self.device)
+            if self.train:
+                return seq_frame_ids, sequence_w_likeli, likelihoods, classes
+            else:
+                return seq_frame_ids, sequence_w_likeli, classes
         else:
             raise NotImplementedError
 
@@ -201,6 +220,9 @@ class MarkersDataset(Dataset):
         if self.train:
             return self.transform.mean_, np.sqrt(self.transform.var_)
         return self.mean, self.std
+
+    def get_all_classes(self):
+        return np.array(self.dataset[:, self.col_class], dtype=np.int32)
 
     def _initialize_and_check_dataset_metadata(self):
         """
@@ -213,7 +235,7 @@ class MarkersDataset(Dataset):
         :return: dataset as pandas dataframe, with FRAME_ID as first column and the other ones contain data
         (coords and likelihoods. The latter, only if present)
         """
-        self.dataset = pd.read_csv(self.dataset_path)
+        self.dataset = pd.read_csv(self.dataset_path, index_col=False)
         self.columns = self.dataset.columns
         self.cols_likelihood = [col.startswith("likelihood") for col in self.dataset.columns]
         self.with_likelihood = True if sum(self.cols_likelihood) > 0 else False
@@ -237,6 +259,8 @@ class MarkersDataset(Dataset):
         # the number of markers
         assert sum(self.cols_likelihood) * 2 == sum(self.cols_coords), \
             f"Number of likelihoods and number of coordinates wrong! Check the header of the dataset file ({self.dataset_path})"
+        self.cols_likelihood, self.cols_coords, self.col_class = \
+            np.array(self.cols_likelihood), np.array(self.cols_coords), np.array(self.col_class)
 
     def _get_likelihoods(self, sequence):
         raise NotImplementedError
@@ -280,6 +304,8 @@ class MarkersDataset(Dataset):
             self.dataset[:, self.cols_coords] = self.transform.transform(self.dataset[:, self.cols_coords])
         else:
             self.dataset[:, self.cols_coords] = (self.dataset[:, self.cols_coords] - self.mean) / self.std
+        # remove offset from frame_id (necessary for the test dataset)
+        self.dataset[:, 0] -= self.dataset[:, 0].min()
         # partial_mask = self.dataset[:, self.cols_likelihood] < getattr(self.args, "threshold")
         # full_mask = np.array(
         #     [np.concatenate((column.reshape(-1, 1), column.reshape(-1, 1), False * np.ones((len(column), 1))), axis=1)
@@ -350,10 +376,12 @@ class MarkersDataset(Dataset):
         print(
             f"With the current configuration of 'SEQUENCE LENGTH' and 'STRIDE', {self.dataset.shape[0] - new_in_frames} "
             f"frames will be erased")
-        # each input sequence has length self.input_size + 1, because we also include the frame_id. Obv, this value
+        # each input sequence has length self.input_size + 2, because we also include the frame_id and behavior_class.
+        # Obv, this value
         # must be removed inside _getitem_. It is just necessary as metadata, in order to keep track of the relation
         # between the frame_id and the input inside the sequence
-        self.input_dataset = torch.empty((self.n_sequences, self.args.sequence_length, 1 + self.input_size),
+        self.dataset = self.dataset[:new_in_frames]
+        self.input_dataset = torch.empty((self.n_sequences, self.args.sequence_length, 2 + self.input_size),
                                          dtype=torch.float32)
         for sequence_idx in range(self.n_sequences):
             for time_idx in range(self.seq_length):
@@ -381,6 +409,8 @@ if __name__ == '__main__':
     # split_dataset("..\\data\\video_4DLC_resnet101_For_Video_October14Oct14shuffle1_111600.csv")
     # ds = MarkersDataset(args)
     # breakpoint()
-    file_behavior = "..\\behavior_labels.csv"
-    file_trajectories = "..\\train_dataset.csv"
-    merge_behavior_and_trajectories(file_behavior, file_trajectories)
+    file_behavior = "..\\data\\behavior_labels_1h6min.csv"
+    file_trajectories = "..\\data\\trajectories1h6min.csv"
+    file_tr_n_beh = "..\\data\\trajectories1h6min_w_behaviors.csv"
+    split_dataset(file_tr_n_beh)
+    merge_behavior_and_trajectories(file_behavior, file_trajectories, save_custom_frames=True)
