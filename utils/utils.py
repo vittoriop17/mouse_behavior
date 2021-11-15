@@ -18,6 +18,8 @@ def upload_args(file_path="config.json"):
     parser.add_argument("--batch_size", required=False, type=int)
     parser.add_argument("--train", required=False, type=bool)
     parser.add_argument("--video", required=False, type=str, help="Video path. Video used for evaluation of results")
+    parser.add_argument("--train_dataset_path", required=False, type=str, help="Train dataset path.")
+    parser.add_argument("--test_dataset_path", required=False, type=str, help="Test dataset path.")
     args = parser.parse_args()
     args = upload_args_from_json(args, file_path)
     print(args)
