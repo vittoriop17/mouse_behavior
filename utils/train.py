@@ -123,8 +123,8 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
         history['train_classification_losses'].append(train_classification_loss)
         history['test_classification_losses'].append(test_classification_loss)
         history['train_denoising_losses'].append(train_denoising_loss)
-        history['train_f1_score'].append(f1_score(train_true_behaviors, train_frame_pred_accumulator.argmax(axis=-1), average='micro'))
-        history['test_f1_score'].append(f1_score(test_true_behaviors, test_frame_pred_accumulator.argmax(axis=-1), average='micro'))
+        history['train_f1_score'].append(f1_score(train_true_behaviors, train_frame_pred_accumulator.argmax(axis=-1), average=None))
+        history['test_f1_score'].append(f1_score(test_true_behaviors, test_frame_pred_accumulator.argmax(axis=-1), average=None))
         print(f"Epoch: {epoch}  \t(time: {te - ts} )\n"
               f"\tCLASSIFICATION:\t\t train loss: {train_classification_loss}  "
               f"test loss: {test_classification_loss} \n"

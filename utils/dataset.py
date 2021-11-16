@@ -409,8 +409,6 @@ if __name__ == '__main__':
     # split_dataset("..\\data\\video_4DLC_resnet101_For_Video_October14Oct14shuffle1_111600.csv")
     # ds = MarkersDataset(args)
     # breakpoint()
-    file_behavior = "..\\data\\behavior_labels_1h6min.csv"
-    file_trajectories = "..\\data\\trajectories1h6min.csv"
-    file_tr_n_beh = "..\\data\\trajectories1h6min_w_behaviors.csv"
-    split_dataset(file_tr_n_beh)
-    merge_behavior_and_trajectories(file_behavior, file_trajectories, save_custom_frames=True)
+    file_behavior = "..\\data\\behavior_labels_22min_front.csv"
+    file_trajectories = "..\\data\\trajectories22min_front.csv"
+    merge_behavior_and_trajectories(file_behavior, file_trajectories, save_custom_frames=False)
