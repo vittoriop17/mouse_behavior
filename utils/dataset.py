@@ -9,6 +9,18 @@ import sklearn
 import cv2
 import utils
 
+def prova(file_path):
+    behavior_count = np.zeros((3,))
+    with open(file_path) as fp:
+        for idx, line in enumerate(fp.readlines()):
+            if idx <= 1:
+                continue
+            behavior, start, end = line.split(",")
+            behavior_count[int(behavior)] += int(end) - int(start)
+            if int(end) - int(start) > 100:
+                breakpoint()
+    return behavior_count
+
 
 def check_start_end(start_end, n_frames):
     flags = None
@@ -166,7 +178,7 @@ def split_dataset(file_path, train_size=0.8):
 
 
 class MarkersDataset(Dataset):
-    def __init__(self, args, train: bool = True, mean: np.array = None, std: np.array = None):
+    def __init__(self, args, train: bool = True):
         self.args = None
         self.original_dataset = None
         self.dataset = None
@@ -179,14 +191,12 @@ class MarkersDataset(Dataset):
         self.n_sequences = None
         self.with_likelihood = True
         self.train = train
-        self.mean = mean
-        self.std = std
         self.check_args(args)
         self.device = args.device
         self.seq_length = args.sequence_length  # represents the number of frames in a single sequence
         self.stride = args.stride  # represents the stride between two consecutive sequences
         self.dataset_path = args.train_dataset_path if self.train else args.test_dataset_path
-        self.transform = StandardScaler(with_std=True, with_mean=True) if train else None
+        self.transform = StandardScaler(with_std=True, with_mean=True)
         if not os.path.isfile(self.dataset_path):
             raise FileNotFoundError(f"{self.dataset_path} does not exist!")
         self.initialize_dataset()
@@ -215,11 +225,6 @@ class MarkersDataset(Dataset):
                 return seq_frame_ids, sequence_w_likeli, classes
         else:
             raise NotImplementedError
-
-    def get_stats(self):
-        if self.train:
-            return self.transform.mean_, np.sqrt(self.transform.var_)
-        return self.mean, self.std
 
     def get_all_classes(self):
         return np.array(self.dataset[:, self.col_class], dtype=np.int32)
@@ -262,15 +267,6 @@ class MarkersDataset(Dataset):
         self.cols_likelihood, self.cols_coords, self.col_class = \
             np.array(self.cols_likelihood), np.array(self.cols_coords), np.array(self.col_class)
 
-    def _get_likelihoods(self, sequence):
-        raise NotImplementedError
-
-    def _get_coords(self, sequence):
-        raise NotImplementedError
-
-    def _get_sequences(self):
-        raise NotImplementedError
-
     def get_center(self, points):
         """
         :param points: 2-D numpy array: shape: (n_points, 2): n_points represents the number of total markers in a
@@ -299,11 +295,8 @@ class MarkersDataset(Dataset):
         self.original_dataset = self.dataset.copy()
         # center all the points by frame
         self.dataset[:, self.cols_coords] = self.normalize_wrt_frame_center(self.dataset[:, self.cols_coords])
-        if self.train:
-            self.transform.fit(self.dataset[:, self.cols_coords])
-            self.dataset[:, self.cols_coords] = self.transform.transform(self.dataset[:, self.cols_coords])
-        else:
-            self.dataset[:, self.cols_coords] = (self.dataset[:, self.cols_coords] - self.mean) / self.std
+        self.transform.fit(self.dataset[:, self.cols_coords])
+        self.dataset[:, self.cols_coords] = self.transform.transform(self.dataset[:, self.cols_coords])
         # remove offset from frame_id (necessary for the test dataset)
         self.dataset[:, 0] -= self.dataset[:, 0].min()
         # partial_mask = self.dataset[:, self.cols_likelihood] < getattr(self.args, "threshold")
@@ -388,6 +381,10 @@ class MarkersDataset(Dataset):
                 row_index = sequence_idx * self.stride + time_idx
                 self.input_dataset[sequence_idx][time_idx] = torch.from_numpy(self.dataset[row_index])
 
+    def get_behavior_proportions(self):
+        all_behaviors = self.dataset[:, self.col_class].astype(np.int32)
+        return np.bincount(all_behaviors.reshape(-1, )) / len(all_behaviors)
+
     def check_args(self, args):
         if not hasattr(args, "device"):
             raise Exception("Argument not found: device")
@@ -406,9 +403,13 @@ class MarkersDataset(Dataset):
 
 if __name__ == '__main__':
     args = utils.upload_args("..\\config.json")
+    setattr(args, "device", "cpu")
+    setattr(args, "train_dataset_path", "..\\data\\trajectories1h6min_w_behaviors.csv")
     # split_dataset("..\\data\\video_4DLC_resnet101_For_Video_October14Oct14shuffle1_111600.csv")
-    # ds = MarkersDataset(args)
+    ds = MarkersDataset(args)
+    # ds.get_behavior_proportions()
     # breakpoint()
+    prova("..\\data\\behavior_labels_1h6min.csv")
     file_behavior = "..\\data\\behavior_labels_22min_front.csv"
     file_trajectories = "..\\data\\trajectories22min_front.csv"
     merge_behavior_and_trajectories(file_behavior, file_trajectories, save_custom_frames=False)

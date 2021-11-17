@@ -7,12 +7,12 @@ import time
 import numpy as np
 from model import new_lstm
 from sklearn.metrics import f1_score
-
+from utils.loss import weighted_mse
 
 def train_test_dataloader(args):
     train_dataset = MarkersDataset(args, train=True)
-    mean, std = train_dataset.get_stats()
-    test_dataset = MarkersDataset(args, mean=mean, std=std, train=False)
+    # mean, std = train_dataset.get_stats()
+    test_dataset = MarkersDataset(args, train=False)
     train_dl = DataLoader(train_dataset, batch_size=getattr(args, 'batch_size'), shuffle=True)
     test_dl = DataLoader(test_dataset, batch_size=getattr(args, 'batch_size'), shuffle=True)
     if np.any(train_dataset.cols_coords!=test_dataset.cols_coords):
@@ -52,9 +52,8 @@ def collapse_predictions(batch_pred_behaviors: torch.tensor, batch_frame_ids, ac
 def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord_cols, alpha=0.5):
     n_epochs = getattr(args, 'n_epochs')
     model.train()
-    # TODO - define WEIGHT for NLLLoss
-    classification_criterion = nn.NLLLoss().to(args.device)  # nn.MSELoss().to(args.device)
-    denoising_criterion = nn.MSELoss().to(args.device)  # nn.MSELoss().to(args.device)
+    classification_criterion = nn.NLLLoss(weight=torch.tensor([1, 0.5, 0.5])).to(args.device)  # nn.MSELoss().to(args.device)
+    denoising_criterion = weighted_mse  # nn.MSELoss().to(args.device)  # nn.MSELoss().to(args.device)
 
     history = dict(train_classification_losses=[],
                    train_denoising_losses=[],
@@ -94,7 +93,7 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
             classification_loss = \
                 classification_criterion(pred_behaviors.view(-1, args.n_behaviors), batch_behaviors.view(-1, ))
             denoising_loss = \
-                denoising_criterion(pred_trajectories, batch_sequences[:, :, coord_cols])
+                denoising_criterion(pred_trajectories, batch_sequences[:, :, coord_cols], batch_likelihoods)
             multi_task_loss = alpha * classification_loss + (1 - alpha) * denoising_loss
             multi_task_loss.backward()
             optimizer.step()
