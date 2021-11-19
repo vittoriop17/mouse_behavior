@@ -8,6 +8,8 @@ import numpy as np
 from model import new_lstm
 from sklearn.metrics import f1_score
 from utils.loss import weighted_mse
+import wandb
+
 
 def train_test_dataloader(args):
     train_dataset = MarkersDataset(args, train=True)
@@ -49,7 +51,11 @@ def collapse_predictions(batch_pred_behaviors: torch.tensor, batch_frame_ids, ac
         accumulator[seq_frame_ids.cpu(), :] += batch_pred_behaviors[batch_idx]
     return accumulator
 
+
 def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord_cols, alpha=0.5):
+    wandb.init(project="mouse_project", entity="vittoriop")
+    wandb.config = args
+    wandb.watch(model)
     n_epochs = getattr(args, 'n_epochs')
     model.train()
     classification_criterion = nn.NLLLoss(weight=torch.tensor([1, 0.5, 0.5])).to(args.device)  # nn.MSELoss().to(args.device)
@@ -59,7 +65,9 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
                    train_denoising_losses=[],
                    test_classification_losses=[],
                    train_f1_score=[],
-                   test_f1_score=[])
+                   test_f1_score=[],
+                   micro_train_f1_score=[],
+                   micro_test_f1_score=[])
     # *_dataloader.dataset.dataset.shape[0] represents the whole number of frames inside the respective
     # dataloader (train or test). This value is necessary in order to collapse different predictions for the same frame
     n_train_frames, n_test_frames = \
@@ -124,11 +132,19 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
         history['train_denoising_losses'].append(train_denoising_loss)
         history['train_f1_score'].append(f1_score(train_true_behaviors, train_frame_pred_accumulator.argmax(axis=-1), average=None))
         history['test_f1_score'].append(f1_score(test_true_behaviors, test_frame_pred_accumulator.argmax(axis=-1), average=None))
+        history['micro_train_f1_score'].append(f1_score(train_true_behaviors, train_frame_pred_accumulator.argmax(axis=-1), average="micro"))
+        history['micro_test_f1_score'].append(f1_score(test_true_behaviors, test_frame_pred_accumulator.argmax(axis=-1), average="micro"))
         print(f"Epoch: {epoch}  \t(time: {te - ts} )\n"
               f"\tCLASSIFICATION:\t\t train loss: {train_classification_loss}  "
               f"test loss: {test_classification_loss} \n"
               f"\tCLASSIFICATION MICRO F1 score: \t train: {history['train_f1_score'][-1]}  "
               f"test: {history['test_f1_score'][-1]}\n"
               f"\tDENOISING:\t\t train loss: {train_denoising_loss}")
-
+        log_all_losses(history)
     return model.eval(), history
+
+
+def log_all_losses(history):
+    for k, v in history:
+        if isinstance(v, list):
+            wandb.log({k: v[-1]})
