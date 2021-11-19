@@ -145,6 +145,6 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
 
 
 def log_all_losses(history):
-    for k, v in history:
+    for k, v in history.items():
         if isinstance(v, list):
             wandb.log({k: v[-1]})
