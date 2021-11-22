@@ -24,6 +24,7 @@ def train_test_dataloader(args):
 
 def train_wrapper(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    alpha = getattr(args, "alpha", 0.5)
     setattr(args, "device", device)
     train_dataloader, test_dataloader, coord_cols = train_test_dataloader(args)
     model = new_lstm.Net_w_conv(args) if args.with_conv else new_lstm.Net(args)
@@ -35,7 +36,7 @@ def train_wrapper(args):
             print(f"During loading the model, the following exception occured: {e}")
             print("The execution will continue anyway")
     model = model.to(args.device)
-    model, history = train_model(model, optimizer, train_dataloader, test_dataloader, args, coord_cols=coord_cols)
+    model, history = train_model(model, optimizer, train_dataloader, test_dataloader, args, coord_cols=coord_cols, alpha=alpha)
 
 
 def collapse_predictions(batch_pred_behaviors: torch.tensor, batch_frame_ids, accumulator):
@@ -59,7 +60,7 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
         wandb.watch(model)
     n_epochs = getattr(args, 'n_epochs')
     model.train()
-    classification_criterion = nn.NLLLoss(weight=torch.tensor([10, 0.25, 0.25])).to(args.device)  # nn.MSELoss().to(args.device)
+    classification_criterion = nn.NLLLoss(weight=torch.tensor([0.9, 0.1])).to(args.device)  # nn.MSELoss().to(args.device)
     denoising_criterion = weighted_mse  # nn.MSELoss().to(args.device)  # nn.MSELoss().to(args.device)
 
     history = dict(train_classification_losses=[],
