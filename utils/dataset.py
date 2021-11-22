@@ -194,7 +194,7 @@ class MarkersDataset(Dataset):
         self.check_args(args)
         self.device = args.device
         self.seq_length = args.sequence_length  # represents the number of frames in a single sequence
-        self.stride = args.stride  # represents the stride between two consecutive sequences
+        self.stride = args.stride * self.seq_length  # represents the stride between two consecutive sequences
         self.dataset_path = args.train_dataset_path if self.train else args.test_dataset_path
         self.transform = StandardScaler(with_std=True, with_mean=True)
         if not os.path.isfile(self.dataset_path):

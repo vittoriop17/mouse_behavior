@@ -5,7 +5,7 @@
   "num_layers": 1,
   "threshold": 0.2,
   "sequence_length": 120,
-  "stride": 60,
+  "stride": 0.5,
   "lr": 5e-4,
   "batch_size": 64,
   "n_epochs": 200,

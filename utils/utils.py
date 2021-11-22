@@ -21,8 +21,8 @@ def upload_args(file_path="config.json"):
     parser.add_argument("--train_dataset_path", required=False, type=str, help="Train dataset path.")
     parser.add_argument("--test_dataset_path", required=False, type=str, help="Test dataset path.")
     parser.add_argument("--dropout", required=False, type=float, help="Network dropout.")
-    parser.add_argument("--stride", required=False, type=int, help="Window stride (for sequence definition)."
-                                                                   "To be intended in absolute terms.")
+    parser.add_argument("--stride", required=False, type=float, help="Window stride (for sequence definition)."
+                                                                     "To be intended in relative terms (perc %).")
     parser.add_argument("--with_conv", required=False, type=bool, help="Specify if use 1-D Convolution, in order"
                                                                       " to preprocess the input sequences")
     args = parser.parse_args()
