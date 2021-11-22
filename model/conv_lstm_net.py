@@ -32,22 +32,28 @@ class PreProcessNet(Module):
                         Conv1d, ResBlock,
                         Conv1d]
         self.down_sampling_modules = []
+        self.paddings = []
         in_size = self.input_size
         for (s, k) in zip(self.strides, self.kernel_sizes):
-            p = (s*in_size - in_size - s + k) / 2
+            p = (s*in_size - in_size - s + k) // 2
+            self.paddings.append(p)
             in_size = check_conv1d_out_dim(in_size=in_size, kernel=k, stride=s, padding=p, dilation=1)
             # pooling operation
-            p = (s*in_size - in_size - s + k) / 2
+            p = (self.pool_stride*in_size - in_size - self.pool_stride + self.pool_kernel) // 2
+            self.paddings.append(p)
             in_size = check_conv1d_out_dim(in_size=in_size, kernel=self.pool_kernel, stride=self.pool_stride, padding=p, dilation=1)
             self.output_sizes.append(in_size)
         for (idx, (module, k, s)) in enumerate(zip(self.modules, self.kernel_sizes, self.strides)):
+            p = self.paddings[idx * 2]
             self.down_sampling_modules.append(module(in_channels=self.channels[idx],
                                                  out_channels=self.channels[idx+1],
                                                  kernel_size=k,
                                                  dilation=1,
                                                  stride=s,
+                                                 padding=p,
                                                  device=args.device))
-            self.down_sampling_modules.append(MaxPool1d(self.pool_kernel, stride=self.pool_stride))
+            p = self.paddings[idx * 2 + 1]
+            self.down_sampling_modules.append(MaxPool1d(self.pool_kernel, stride=self.pool_stride, padding=p))
             self.down_sampling_modules.append(LeakyReLU(0.1))
 
         self.down_sampling_net = Sequential(*self.down_sampling_modules)
@@ -61,7 +67,7 @@ class PreProcessNet(Module):
 
 
 class ResBlock(Module):
-    def __init__(self, in_channels, out_channels, dilation, stride, kernel_size, device):
+    def __init__(self, in_channels, out_channels, dilation, stride, kernel_size, device, padding):
         super(ResBlock, self).__init__()
         self.kernel_size = kernel_size
         self.dilation = dilation
@@ -69,10 +75,10 @@ class ResBlock(Module):
         self.device = device
         self.in_c = in_channels
         self.out_c = out_channels
-        self.left = Sequential(MaxPool1d(kernel_size=self.kernel_size, dilation=self.dilation, stride=stride),
+        self.left = Sequential(MaxPool1d(kernel_size=self.kernel_size, dilation=self.dilation, stride=stride, padding=padding),
                                ReLU())
-        self.right = Sequential(Conv1d(in_channels=self.in_c, out_channels=self.in_c, kernel_size=1, device=self.device),
-                                Conv1d(in_channels=self.in_c, out_channels=self.out_c, kernel_size=self.kernel_size, dilation=self.dilation, stride=stride, device=self.device))
+        self.right = Sequential(Conv1d(in_channels=self.in_c, out_channels=self.in_c, kernel_size=1, padding=padding, device=self.device),
+                                Conv1d(in_channels=self.in_c, out_channels=self.out_c, kernel_size=self.kernel_size, padding=padding, dilation=self.dilation, stride=stride, device=self.device))
 
     def forward(self, x):
         x_left = self.left(x)
