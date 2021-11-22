@@ -142,8 +142,8 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
               f"\tCLASSIFICATION MICRO F1 score: \t train: {history['train_f1_score'][-1]}  "
               f"test: {history['test_f1_score'][-1]}\n"
               f"\tDENOISING:\t\t train loss: {train_denoising_loss}")
-        if history["best_grooming_f1_score"] < history['test_f1_score'][0]:
-            history["best_grooming_f1_score"] = history['test_f1_score'][0]
+        if history["best_grooming_f1_score"] < history['test_f1_score'][-1][0]:
+            history["best_grooming_f1_score"] = history['test_f1_score'][-1][0]
         if getattr(args, "device", "cpu") is not "cpu":
             log_all_losses(history)
     return model.eval(), history
