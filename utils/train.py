@@ -69,7 +69,8 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
                    train_f1_score=[],
                    test_f1_score=[],
                    micro_train_f1_score=[],
-                   micro_test_f1_score=[])
+                   micro_test_f1_score=[],
+                   best_grooming_f1_score=0)
     # *_dataloader.dataset.dataset.shape[0] represents the whole number of frames inside the respective
     # dataloader (train or test). This value is necessary in order to collapse different predictions for the same frame
     n_train_frames, n_test_frames = \
@@ -119,7 +120,6 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
                 (batch_frame_ids, batch_sequences, batch_behaviors) = \
                     (batch_frame_ids.to(args.device), batch_sequences.to(args.device), batch_behaviors.to(args.device))
                 pred_behaviors, _ = model(batch_sequences)
-                # TODO - check pred_behaviors after 'view'
                 test_classification_loss = \
                     classification_criterion(pred_behaviors.view(-1, args.n_behaviors), batch_behaviors.view(-1,))
                 test_batch_classification_losses.append(test_classification_loss.item())
@@ -142,6 +142,8 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
               f"\tCLASSIFICATION MICRO F1 score: \t train: {history['train_f1_score'][-1]}  "
               f"test: {history['test_f1_score'][-1]}\n"
               f"\tDENOISING:\t\t train loss: {train_denoising_loss}")
+        if history["best_grooming_f1_score"] < history['test_f1_score'][0]:
+            history["best_grooming_f1_score"] = history['test_f1_score'][0]
         if getattr(args, "device", "cpu") is not "cpu":
             log_all_losses(history)
     return model.eval(), history
