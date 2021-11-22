@@ -55,8 +55,7 @@ def collapse_predictions(batch_pred_behaviors: torch.tensor, batch_frame_ids, ac
 
 def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord_cols, alpha=0.5):
     if getattr(args, "device", "cpu") is not "cpu":
-        wandb.init(project="mouse_project", entity="vittoriop")
-        wandb.config = args.__dict__
+        wandb.init(project="mouse_project", entity="vittoriop", config=args.__dict__)
         wandb.watch(model)
     n_epochs = getattr(args, 'n_epochs')
     model.train()
