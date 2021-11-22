@@ -3,7 +3,7 @@ from torch import nn
 import torch
 import os
 from utils.utils import upload_args
-from conv_lstm_net import PreProcessNet
+from model.conv_lstm_net import PreProcessNet
 
 
 HIDDEN_SIZE = 100

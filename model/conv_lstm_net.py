@@ -34,9 +34,11 @@ class PreProcessNet(Module):
         self.down_sampling_modules = []
         in_size = self.input_size
         for (s, k) in zip(self.strides, self.kernel_sizes):
-            in_size = check_conv1d_out_dim(in_size=in_size, kernel=k, stride=s, padding=0, dilation=1)
+            p = (s*in_size - in_size - s + k) / 2
+            in_size = check_conv1d_out_dim(in_size=in_size, kernel=k, stride=s, padding=p, dilation=1)
             # pooling operation
-            in_size = check_conv1d_out_dim(in_size=in_size, kernel=self.pool_kernel, stride=self.pool_stride, padding=0, dilation=1)
+            p = (s*in_size - in_size - s + k) / 2
+            in_size = check_conv1d_out_dim(in_size=in_size, kernel=self.pool_kernel, stride=self.pool_stride, padding=p, dilation=1)
             self.output_sizes.append(in_size)
         for (idx, (module, k, s)) in enumerate(zip(self.modules, self.kernel_sizes, self.strides)):
             self.down_sampling_modules.append(module(in_channels=self.channels[idx],
