@@ -20,7 +20,7 @@ def save_trajectories(train_dataset: dataset.MarkersDataset, test_dataset: datas
     for frame_id in range(final_train.shape[0]):
         if train_mask[frame_id].sum() == 0:
             continue
-        idx = np.array(generate_sequence_idx(frame_id, params.sequence_length, train_dataset.n_sequences))
+        idx = np.array(generate_sequence_idx(frame_id, params.final_input_size, train_dataset.n_sequences))
         frame_preds = np.array([train_pred[seq_id, in_seq_id] for seq_id, in_seq_id in idx])
         frame_preds = np.average(frame_preds, axis=0)
         np.argwhere(train_mask[frame_id] == True)
@@ -31,7 +31,7 @@ def save_trajectories(train_dataset: dataset.MarkersDataset, test_dataset: datas
     for frame_id in range(final_test.shape[0]):
         if test_mask[frame_id].sum() == 0:
             continue
-        idx = np.array(generate_sequence_idx(frame_id, params.sequence_length, test_dataset.n_sequences))
+        idx = np.array(generate_sequence_idx(frame_id, params.final_input_size, test_dataset.n_sequences))
         frame_preds = np.array([test_pred[seq_id, in_seq_id] for seq_id, in_seq_id in idx])
         frame_preds = np.average(frame_preds, axis=0)
         np.argwhere(test_mask[frame_id] == True)

@@ -3,6 +3,7 @@ from torch import nn
 import torch
 import os
 from utils.utils import upload_args
+from conv_lstm_net import PreProcessNet
 
 
 HIDDEN_SIZE = 100
@@ -103,7 +104,7 @@ class Attention(nn.Module):
 
 
 class EncoderLSTM(nn.Module):
-    def __init__(self, args, merge_out=False, bidirectional=True):
+    def __init__(self, args, merge_out=False, bidirectional=True, override_input_size=None):
         super(EncoderLSTM, self).__init__()
         self.bidirectional = bidirectional
         self.D = 2 if self.bidirectional else 1
@@ -112,7 +113,7 @@ class EncoderLSTM(nn.Module):
         self.device = getattr(args, "device", DEVICE)
         self.n_markers = getattr(args, "n_markers", KeyError("n_markers argument not found!"))
         self.wl = 3 if getattr(args, "with_likelihood", True) else 2
-        self.input_size = self.wl * self.n_markers
+        self.input_size = self.wl * self.n_markers if override_input_size is None else override_input_size
         self.hidden_size = getattr(args, "hidden_size", HIDDEN_SIZE)
         self.num_layers = getattr(args, "num_layers", NUM_LAYERS)
         self.encoder = nn.LSTM(input_size=self.input_size, hidden_size=self.hidden_size,
@@ -130,7 +131,7 @@ class EncoderLSTM(nn.Module):
         # N=batch_size
         # [N, seq_length, D*hidden_size], ([D*num_layers, N, hidden_size], ...)
         x_enc, (h_n, _) = self.encoder(x)
-        if self.merge_out:
+        if self.merge_out and self.bidirectional:
             # assuming the LSTM net is bidirectional
             x_enc = (x_enc[:, :, :self.hidden_size] + x_enc[:, :, self.hidden_size:]) / 2
         return x_enc, h_n
@@ -149,7 +150,7 @@ class DecoderLSTM(nn.Module):
 
 
 class Net(nn.Module):
-    def __init__(self, args, bidirectional=True):
+    def __init__(self, args, bidirectional=True, override_input_size=None):
         super(Net, self).__init__()
         self.bidirectional = bidirectional
         self.D = 2 if self.bidirectional else 1
@@ -159,7 +160,7 @@ class Net(nn.Module):
         self.n_behaviors = getattr(args, "n_behaviors", KeyError("n_behaviors argument not found!"))
         self.n_markers = getattr(args, "n_markers", KeyError("n_markers argument not found!"))
         self.wl = 3 if getattr(args, "with_likelihood", True) else 2
-        self.encoder = EncoderLSTM(args)
+        self.encoder = EncoderLSTM(args, override_input_size=override_input_size)
         self.dec_input_size = self.encoder.output_size
         self.attention_behavior = Attention(self.D*self.hidden_size)
         self.attention_denoising = Attention(self.D*self.hidden_size)
@@ -219,9 +220,34 @@ class Net(nn.Module):
         return behavior_sequence, trajectory_sequence
 
 
+class Net_w_conv(nn.Module):
+    def __init__(self, args):
+        super(Net_w_conv, self).__init__()
+        self.conv_net = PreProcessNet(args)
+        # the temporal dimension had length 'sequence_length' (usually set to 120).
+        # now, after the conv_net preprocessing, the size became self.conv_net.final_size
+        # this new value should be lower than the previous one, thanks to the convolutions
+        self.num_sequences = self.conv_net.final_size
+        # the original input size (for a single frame) was n_markers * 3 (x,y,likelihood)
+        # now, after the conv_net preprocessing, the size became self.conv_net.num_channels
+        self.input_size = self.conv_net.num_channels
+        setattr(args, "sequence_length", self.num_sequences)
+        self.lstm_net = Net(args, override_input_size=self.input_size)
+
+    def forward(self, x):
+        # x must have the following shape:
+        # [Batch_size, INPUT_CHANNELS, SEQ_LENGTH]
+        # where INPUT_CHANNELS represents the size of a temporal input (number of coordinates + number of likelihoods)
+        x = x.transpose(1, 2)
+        x = self.conv_net(x)
+        x = x.transpose(1, 2)
+        return self.lstm_net(x)
+
+
 if __name__=='__main__':
     args = upload_args("..\\config.json")
-    net = Net(args)
+    setattr(args, "device", "cpu")
+    net = Net_w_conv(args)
     # x_seq shape: [Batch_size, Seq_length, input_size]...
     # Input size refers to the length of the input in a specified instant time.
     # input_size = 24, since we have 8 triplets (x,y,L) for each marker

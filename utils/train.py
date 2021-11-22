@@ -26,7 +26,7 @@ def train_wrapper(args):
     device = "cuda" if torch.cuda.is_available() else "cpu"
     setattr(args, "device", device)
     train_dataloader, test_dataloader, coord_cols = train_test_dataloader(args)
-    model = new_lstm.Net(args)
+    model = new_lstm.Net_w_conv(args) if args.with_conv else new_lstm.Net(args)
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     if getattr(args, "load_model", False) and getattr(args, "checkpoint_path", False):
         try:

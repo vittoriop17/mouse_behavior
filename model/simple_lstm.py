@@ -21,7 +21,7 @@ class Encoder(nn.Module):
         # e.g.: sequence length=3 if we feed the network with 3 samples taken in three consecutive time instants
         # print(f"Input shape: {x.shape}")
         x_enc, (_, _) = self.lstm_encoder(x)
-        # x_enc.shape should be: (N, L, H_out): (batch_size, sequence_length, proj_size)
+        # x_enc.shape should be: (N, L, H_out): (batch_size, final_input_size, proj_size)
         # print(f"Input encoded shape: {x_enc.shape}")
         return x_enc
 

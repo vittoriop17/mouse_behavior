@@ -23,6 +23,8 @@ def upload_args(file_path="config.json"):
     parser.add_argument("--dropout", required=False, type=float, help="Network dropout.")
     parser.add_argument("--stride", required=False, type=int, help="Window stride (for sequence definition)."
                                                                    "To be intended in absolute terms.")
+    parser.add_argument("--with_conv", require=False, type=bool, help="Specify if use 1-D Convolution, in order"
+                                                                      " to preprocess the input sequences")
     args = parser.parse_args()
     args = upload_args_from_json(args, file_path)
     print(args)
