@@ -59,6 +59,7 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
         wandb.watch(model)
     n_epochs = getattr(args, 'n_epochs')
     model.train()
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=20, gamma=0.1, verbose=True)
     classification_criterion = nn.NLLLoss(weight=torch.tensor([0.9, 0.1])).to(args.device)  # nn.MSELoss().to(args.device)
     denoising_criterion = weighted_mse  # nn.MSELoss().to(args.device)  # nn.MSELoss().to(args.device)
 
@@ -106,7 +107,7 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
                 denoising_criterion(pred_trajectories, batch_sequences[:, :, coord_cols], batch_likelihoods)
             multi_task_loss = alpha * classification_loss + (1 - alpha) * denoising_loss
             multi_task_loss.backward()
-            optimizer.step()
+            scheduler.step()
             train_batch_classification_losses.append(classification_loss.item())
             train_batch_denoising_losses.append(denoising_loss.item())
             # Collapse predictions by frame id (remember: same frame may be in several sequences --> then, collapse)
