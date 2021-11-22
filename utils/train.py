@@ -145,6 +145,7 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
             history["best_grooming_f1_score"] = history['test_f1_score'][-1][0]
         if getattr(args, "device", "cpu") is not "cpu":
             log_all_losses(history)
+    print(f"BEST GROOMING F1 SCORE: {history['best_grooming_f1_score']}")
     return model.eval(), history
 
 
