@@ -77,7 +77,7 @@ class ResBlock(Module):
         self.out_c = out_channels
         self.left = Sequential(MaxPool1d(kernel_size=self.kernel_size, dilation=self.dilation, stride=stride, padding=padding),
                                ReLU())
-        self.right = Sequential(Conv1d(in_channels=self.in_c, out_channels=self.in_c, kernel_size=1, padding=padding, device=self.device),
+        self.right = Sequential(Conv1d(in_channels=self.in_c, out_channels=self.in_c, kernel_size=1, device=self.device),
                                 Conv1d(in_channels=self.in_c, out_channels=self.out_c, kernel_size=self.kernel_size, padding=padding, dilation=self.dilation, stride=stride, device=self.device))
 
     def forward(self, x):
