@@ -9,8 +9,48 @@ from model import new_lstm
 from sklearn.metrics import f1_score
 from utils.loss import weighted_mse
 import wandb
+import pandas as pd
+
 
 # TODO - plot center movement (in function of time)
+
+
+def denoise_trajectories_from_checkpoint(checkpoint_path, args):
+    setattr(args, "stride", 1)
+    setattr(args, "device", "cpu")
+    model = new_lstm.Net(args)
+    checkpoint = torch.load(checkpoint_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
+    model.load_state_dict(checkpoint)
+    train_dataset = MarkersDataset(args)
+    setattr(args, "train", False)
+    test_dataset = MarkersDataset(args, train=False)
+    train_dl, test_dl = DataLoader(train_dataset, batch_size=64), DataLoader(test_dataset, batch_size=64)
+    train_denoised = torch.zeros((train_dataset.dataset.shape[0], 16))
+    train_classes = torch.zeros((train_dataset.dataset.shape[0],), dtype=torch.long)
+    test_denoised = torch.zeros((test_dataset.dataset.shape[0], 16))
+    test_classes = torch.zeros((test_dataset.dataset.shape[0],), dtype=torch.long)
+    for (batch_frame_ids, batch_sequences, _, batch_classes) in train_dl:
+        pred_behaviors, pred_trajectories = model(batch_sequences)
+        for relative_idx, frame_idx in enumerate(batch_frame_ids):
+            frame_idx = frame_idx.detach().numpy()
+            train_denoised[frame_idx] = pred_trajectories[relative_idx]
+            train_classes[frame_idx] = batch_classes[relative_idx].view(-1,)
+
+    for (batch_frame_ids, batch_sequences, batch_classes) in test_dl:
+        pred_behaviors, pred_trajectories = model(batch_sequences)
+        for relative_idx, frame_idx in enumerate(batch_frame_ids):
+            frame_idx = frame_idx.detach().numpy()
+            test_denoised[frame_idx] = pred_trajectories[relative_idx]
+            test_classes[frame_idx] = batch_classes[relative_idx].view(-1,)
+    test_denoised = torch.cat((test_denoised, test_classes), dim=-1)
+    test_denoised = test_denoised.detach().numpy()
+    train_denoised = torch.cat((train_denoised, train_classes), dim=-1)
+    train_denoised = train_denoised.detach().numpy()
+    columns = list(train_dataset.columns[train_dataset.cols_coords])
+    columns.extend(train_dataset.columns[train_dataset.col_class])
+    np.savetxt("train_denoised_dataset.csv", train_denoised, delimiter=',', header=columns)
+    np.savetxt("test_denoised_dataset.csv", test_denoised, delimiter=',', header=columns)
+
 
 def train_test_dataloader(args):
     train_dataset = MarkersDataset(args, train=True)
