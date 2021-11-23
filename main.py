@@ -79,6 +79,6 @@ def main(params):
 
 if __name__ == '__main__':
     args = utils.upload_args()
-    # main(args)
-    checkpoint_path = "data\\checkpoint.pt"
-    train.denoise_trajectories_from_checkpoint(checkpoint_path, args)
+    main(args)
+    # checkpoint_path = "data\\checkpoint.pt"
+    # train.denoise_trajectories_from_checkpoint(checkpoint_path, args)
