@@ -25,10 +25,10 @@ def denoise_trajectories_from_checkpoint(checkpoint_path, args):
     setattr(args, "train", False)
     test_dataset = MarkersDataset(args, train=False)
     train_dl, test_dl = DataLoader(train_dataset, batch_size=64), DataLoader(test_dataset, batch_size=64)
-    train_denoised = torch.zeros((train_dataset.dataset.shape[0], 16))
-    train_classes = torch.zeros((train_dataset.dataset.shape[0],), dtype=torch.long)
-    test_denoised = torch.zeros((test_dataset.dataset.shape[0], 16))
-    test_classes = torch.zeros((test_dataset.dataset.shape[0],), dtype=torch.long)
+    train_denoised = torch.zeros((train_dataset.dataset.shape[0], 16), requires_grad=False)
+    train_classes = torch.zeros((train_dataset.dataset.shape[0],), dtype=torch.long, requires_grad=False)
+    test_denoised = torch.zeros((test_dataset.dataset.shape[0], 16), requires_grad=False)
+    test_classes = torch.zeros((test_dataset.dataset.shape[0],), dtype=torch.long, requires_grad=False)
     for (batch_frame_ids, batch_sequences, _, batch_classes) in train_dl:
         pred_behaviors, pred_trajectories = model(batch_sequences)
         for relative_idx, frame_idx in enumerate(batch_frame_ids):
