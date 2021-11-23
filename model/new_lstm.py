@@ -204,7 +204,7 @@ class Net(nn.Module):
             decoded_behavior_sequence.append(query)
             if self.encoder.training:  # Predict also the de-noised trajectory
                 query_denoising = torch.unsqueeze(query_denoising, dim=1)
-                out_attn_denoising, attn_w_denoising = self.attention_denoising(context=out_enc, query=query_denoising)
+                out_attn_denoising, attn_w_denoising = self.attention_behavior(context=out_enc, query=query_denoising)
                 out_attn_denoising = torch.squeeze(out_attn_denoising, dim=1)
                 query_denoising = torch.squeeze(query_denoising, dim=1)
                 query_denoising, c_i_denoising = self.decoder_denoising(out_attn_denoising,
