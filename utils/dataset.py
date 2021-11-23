@@ -276,10 +276,25 @@ class MarkersDataset(Dataset):
         """
         return np.sum(points, axis=0) / points.shape[0]
 
+    def get_sequence_center(self, seq_points):
+        """
+        :param points: 3-D numpy array: shape: (seq_length, n_points, 2): n_points represents the number of total markers in a
+        single frame. Seq_length represents the number of frames inside the sequence
+        :return: (x_c, y_c): center coordinates
+        """
+        return self.get_center(np.reshape(seq_points, (-1, 2)))
+
     def recenter(self, points):
         points_ = points.reshape(-1, 2)
         points_ = points_ - self.get_center(points_)
         return points_.reshape(-1, )
+
+    def normalize_wrt_sequence_center(self, sequence):
+        sequence_center = self.get_sequence_center(sequence)
+        N_SEQ, SEQ_LEN = sequence.shape
+        app_sequence = sequence.reshape(-1, 2)
+        app_sequence = app_sequence - sequence_center
+        return app_sequence.reshape(N_SEQ, SEQ_LEN)
 
     def normalize_wrt_frame_center(self, dataset: np.array):
         """
@@ -326,13 +341,18 @@ class MarkersDataset(Dataset):
             for time_idx in range(self.seq_length):
                 row_index = sequence_idx * self.stride + time_idx
                 self.input_dataset[sequence_idx][time_idx] = torch.from_numpy(self.dataset[row_index])
+            if self.preprocess == 'recenter_by_sequence':
+                self.input_dataset[sequence_idx, :, self.cols_coords] = \
+                    torch.tensor(self.normalize_wrt_sequence_center(self.input_dataset[sequence_idx, :, self.cols_coords].detach().numpy()))
         # construct the last sequence
         row_index = self.dataset.shape[0] - self.seq_length
         for time_idx in range(self.seq_length):
             self.input_dataset[self.n_sequences-1][time_idx] = torch.from_numpy(self.dataset[row_index])
             row_index += 1
-
-
+        if self.preprocess == 'recenter_by_sequence':
+            self.input_dataset[sequence_idx, :, self.cols_coords] = \
+                torch.tensor(self.normalize_wrt_sequence_center(
+                    self.input_dataset[-1, :, self.cols_coords].detach().numpy()))
 
     def get_behavior_proportions(self):
         all_behaviors = self.dataset[:, self.col_class].astype(np.int32)
