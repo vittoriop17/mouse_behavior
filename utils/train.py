@@ -144,6 +144,7 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
               f"\tDENOISING:\t\t train loss: {train_denoising_loss}")
         if history["best_grooming_f1_score"] < history['test_f1_score'][-1][0]:
             history["best_grooming_f1_score"] = history['test_f1_score'][-1][0]
+            torch.save(model.state_dict(), "checkpoint.pt")
         if getattr(args, "device", "cpu") is not "cpu":
             log_all_losses(history)
     print(f"BEST GROOMING F1 SCORE: {history['best_grooming_f1_score']}")

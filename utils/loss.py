@@ -16,7 +16,7 @@ def weighted_mse(predicted: torch.tensor, target: torch.tensor, weights: torch.t
     square_diffs = square_diffs.view(N*SEQ_LENGTH*(INPUT_SIZE//2), 2)
     square_diffs = torch.sum(square_diffs, dim=1)
     weights = weights.view(N*SEQ_LENGTH*(INPUT_SIZE//2), )
-    return torch.sum(weights * square_diffs) / ( N * SEQ_LENGTH * INPUT_SIZE )
+    return 1e-4 * torch.sum(weights * square_diffs) / ( N * SEQ_LENGTH * INPUT_SIZE )
 
 
 if __name__=='__main__':

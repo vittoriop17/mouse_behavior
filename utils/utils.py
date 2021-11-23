@@ -20,6 +20,11 @@ def upload_args(file_path="config.json"):
     parser.add_argument("--video", required=False, type=str, help="Video path. Video used for evaluation of results")
     parser.add_argument("--train_dataset_path", required=False, type=str, help="Train dataset path.")
     parser.add_argument("--test_dataset_path", required=False, type=str, help="Test dataset path.")
+    parser.add_argument("--preprocess", required=False, type=str, help="Possible options: "
+                                                                       "recenter: apply centering by frame and normalization by coordinate "
+                                                                       "normalize: apply only normalization by coordinate "
+                                                                       "recenter_by_sequence: apply centering by frame considering the mean-center of the current sequence "
+                                                                       "... otherwise, do nothing (raw trajectories)")
     parser.add_argument("--dropout", required=False, type=float, help="Network dropout.")
     parser.add_argument("--alpha", required=False, type=float, help="Parameter for weighting the 2 losses (needed for training)")
     parser.add_argument("--stride", required=False, type=float, help="Window stride (for sequence definition)."
