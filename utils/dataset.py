@@ -190,6 +190,7 @@ class MarkersDataset(Dataset):
         self.target_dataset = None
         self.n_sequences = None
         self.with_likelihood = True
+        self.preprocess = getattr(args, "preprocess", "recenter")
         self.train = train
         self.check_args(args)
         self.device = args.device
@@ -293,93 +294,45 @@ class MarkersDataset(Dataset):
         self.dataset = np.array(self.dataset)
         # copy the dataset. In this way, we can still be able to recover the original likelihoods and original coords
         self.original_dataset = self.dataset.copy()
-        # center all the points by frame
-        self.dataset[:, self.cols_coords] = self.normalize_wrt_frame_center(self.dataset[:, self.cols_coords])
-        self.transform.fit(self.dataset[:, self.cols_coords])
-        self.dataset[:, self.cols_coords] = self.transform.transform(self.dataset[:, self.cols_coords])
+        if self.preprocess == 'recenter':  # Apply recentering (by frame) and normalization (w.r.t the whole dataset)
+            # center all the points by frame
+            self.dataset[:, self.cols_coords] = self.normalize_wrt_frame_center(self.dataset[:, self.cols_coords])
+            self.transform.fit(self.dataset[:, self.cols_coords])
+            self.dataset[:, self.cols_coords] = self.transform.transform(self.dataset[:, self.cols_coords])
+        elif self.preprocess == 'normalize':  # apply only normalization (without recentering)
+            self.transform.fit(self.dataset[:, self.cols_coords])
+            self.dataset[:, self.cols_coords] = self.transform.transform(self.dataset[:, self.cols_coords])
+        elif self.preprocess == "recenter_by_sequence":
+            # recenter all the trajectories considering the mean-center of each input sequence
+            # this can't be done here. This will be done during the creation of the sequences!
+            pass
+        # else, do nothing (use raw trajectories)
+
         # remove offset from frame_id (necessary for the test dataset)
         self.dataset[:, 0] -= self.dataset[:, 0].min()
-        # partial_mask = self.dataset[:, self.cols_likelihood] < getattr(self.args, "threshold")
-        # full_mask = np.array(
-        #     [np.concatenate((column.reshape(-1, 1), column.reshape(-1, 1), False * np.ones((len(column), 1))), axis=1)
-        #      for column in partial_mask.T], dtype=np.bool8)
-        # full_mask = np.concatenate(full_mask, axis=-1)
-        # self.dataset[full_mask] = 0
-        # self.fill_fake_dataset()
-        # if self.train:
-        #     self.transform.fit(self.fake_dataset)
-        #     self.dataset = self.transform.transform(self.dataset)
-        #     self.fake_dataset = self.transform.transform(self.fake_dataset)
-        # else:
-        #     self.dataset = (self.dataset - self.mean) / self.std
-        #     self.fake_dataset = (self.fake_dataset - self.mean) / self.std
-
-    #
-    # def fill_fake_dataset(self):
-    #     self.fake_dataset = self.dataset
-    #     for index, row in enumerate(self.fake_dataset):
-    #         app_index = index
-    #         mask = row == 0
-    #         if index == 0:
-    #             while mask.sum() != 0:
-    #                 self.fake_dataset[index][mask] = self.fake_dataset[app_index + 1][mask]
-    #                 mask = self.fake_dataset[index] == 0
-    #                 app_index += 1
-    #             continue
-    #         if index == (self.fake_dataset.shape[0] - 1):
-    #             while mask.sum() != 0:
-    #                 self.fake_dataset[index][mask] = self.fake_dataset[app_index - 1][mask]
-    #                 mask = self.fake_dataset[index] == 0
-    #                 app_index -= 1
-    #             continue
-    #         inc_row = np.zeros((mask.shape), dtype=np.float32)
-    #         while mask.sum() != 0 and (app_index + 1) < self.fake_dataset.shape[0]:
-    #             inc_row[mask] = (self.fake_dataset[app_index + 1][mask] - self.fake_dataset[index - 1][mask]) / (
-    #                         app_index - index + 2)
-    #             app_index += 1
-    #             mask = np.bitwise_and(mask, self.fake_dataset[app_index] == 0)
-    #             inc_row[mask] = 0
-    #         mask = row == 0
-    #         self.fake_dataset[index][mask] = self.fake_dataset[index - 1][mask] + inc_row[mask]
-
-    # def old_create_sequences(self):
-    #     new_in_frames, self.n_sequences = get_n_frames(self.dataset.shape[0], self.seq_length, self.stride)
-    #     print(f"With the current configuration of 'SEQUENCE LENGTH' and 'STRIDE', {self.dataset.shape[0]-new_in_frames} "
-    #           f"frames will be erased (in equal part, from the beginning and the end of the whole sequence)")
-    #     start_idx = (self.dataset.shape[0] - new_in_frames) // 2
-    #     end_idx = new_in_frames + start_idx + 1
-    #     # input_dataset: the dataset used as input for our lstm architecture (the one filled with ZEROS where the
-    #     # likelihood is lower than 'threshold'.
-    #     # target_dataset: the dataset used as target for our prediction, the one filled with fake values
-    #     self.input_dataset = torch.empty((self.n_sequences, self.args.sequence_length, self.input_size),
-    #                                      dtype=torch.float32)
-    #     self.target_dataset = torch.empty((self.n_sequences, self.args.sequence_length, self.input_size),
-    #                                       dtype=torch.float32)
-    #     for sequence_idx in range(self.n_sequences):
-    #         for time_idx in range(self.args.sequence_length):
-    #             row_index = sequence_idx + time_idx
-    #             self.input_dataset[sequence_idx][time_idx] = torch.from_numpy(self.dataset[row_index][self.cols_coords])
-    #             self.target_dataset[sequence_idx][time_idx] = torch.from_numpy(
-    #                 self.fake_dataset[row_index][self.cols_coords])
-    #     # print(f"Input dataset shape: {self.input_dataset.shape}")
-    #     # print(f"Target dataset shape: {self.target_dataset.shape}")
 
     def create_sequences(self):
         new_in_frames, self.n_sequences = get_n_frames(self.dataset.shape[0], self.seq_length, self.stride)
-        print(
-            f"With the current configuration of 'SEQUENCE LENGTH' and 'STRIDE', {self.dataset.shape[0] - new_in_frames} "
-            f"frames will be erased")
+        # the following check is necessary in order to avoid that the few frames can be discarded
+        if self.dataset.shape[0] - new_in_frames > 0:
+            self.n_sequences += 1
         # each input sequence has length self.input_size + 2, because we also include the frame_id and behavior_class.
         # Obv, this value
         # must be removed inside _getitem_. It is just necessary as metadata, in order to keep track of the relation
         # between the frame_id and the input inside the sequence
-        self.dataset = self.dataset[:new_in_frames]
         self.input_dataset = torch.empty((self.n_sequences, self.args.sequence_length, 2 + self.input_size),
                                          dtype=torch.float32)
-        for sequence_idx in range(self.n_sequences):
+        for sequence_idx in range(self.n_sequences - 1):
             for time_idx in range(self.seq_length):
                 row_index = sequence_idx * self.stride + time_idx
                 self.input_dataset[sequence_idx][time_idx] = torch.from_numpy(self.dataset[row_index])
+        # construct the last sequence
+        row_index = self.dataset.shape[0] - self.seq_length
+        for time_idx in range(self.seq_length):
+            self.input_dataset[self.n_sequences-1][time_idx] = torch.from_numpy(self.dataset[row_index])
+            row_index += 1
+
+
 
     def get_behavior_proportions(self):
         all_behaviors = self.dataset[:, self.col_class].astype(np.int32)

@@ -9,7 +9,7 @@
   "lr": 5e-4,
   "batch_size": 64,
   "n_epochs": 200,
-  "train_dataset_path": "D:\\UNIVERSITA\\KTH\\Semestre 1\\Project Course in Data Science\\CODE\\data\\test_22min_front.csv",
+  "train_dataset_path": "D:\\UNIVERSITA\\KTH\\Semestre 1\\Project Course in Data Science\\CODE\\data\\train_dataset.csv",
   "test_dataset_path": "D:\\UNIVERSITA\\KTH\\Semestre 1\\Project Course in Data Science\\CODE\\data\\test_22min_front.csv",
   "n_behaviors": 2,
   "n_markers": 8,
@@ -17,5 +17,6 @@
   "encoder_input_size": 24,
   "train": "True",
   "with_conv": "False",
-  "alpha": 0.9
+  "alpha": 0.9,
+  "preprocess": "None"
 }

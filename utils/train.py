@@ -10,6 +10,7 @@ from sklearn.metrics import f1_score
 from utils.loss import weighted_mse
 import wandb
 
+# TODO - plot center movement (in function of time)
 
 def train_test_dataloader(args):
     train_dataset = MarkersDataset(args, train=True)

@@ -2,6 +2,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 from pandas.tests.io.parser import test_skiprows
+import pandas as pd
 
 
 def plot_points_and_time(point_coords, marker_names):
@@ -46,6 +47,7 @@ def plot_trajectories(point_coords, coord_names=None):
             ax[1].set_title(coord_names[idx*2+1])
     plt.tight_layout()
 
+
 def get_center(points):
     """
     :param points: 2-D numpy array: shape: (n_points, 2): n_points represents the number of total markers in a
@@ -54,10 +56,19 @@ def get_center(points):
     """
     return np.sum(points, axis=0) / points.shape[0]
 
+
 def recenter(points):
     points_ = points.reshape(-1, 2)
     points_ = points_ - get_center(points_)
     return points_.reshape(-1, )
+
+def get_center_after_reshape(points):
+    points_ = points.reshape(-1, 2)
+    return get_center(points_)
+
+def get_all_centers(dataset):
+    return np.apply_along_axis(get_center_after_reshape, arr=dataset, axis=-1)
+
 
 def normalize_wrt_frame_center(dataset: np.array):
     """
@@ -67,16 +78,37 @@ def normalize_wrt_frame_center(dataset: np.array):
     """
     return np.apply_along_axis(recenter, arr=dataset, axis=-1)
 
+
+def plot_center_evolution(dataset_path):
+    df = pd.read_csv(dataset_path)
+    idx = []
+    for _, col in enumerate(np.array(df.columns)):
+        if col.startswith("x_") or col.startswith("y_"):
+            idx.append(True)
+        else:
+            idx.append(False)
+    np_array = df.loc[:, idx]
+    centers = get_all_centers(np_array)
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    for idx, (xs,ys) in enumerate(centers):
+        if idx == 50:
+            break
+        ax.scatter(idx, xs, ys, alpha=.3)
+
+
 if __name__=='__main__':
-    dataset = np.loadtxt("..\\train_dataset.csv", skiprows=1, delimiter=',')
-    likelihood_cols = [2,5,8,11,14]
-    coord_cols = list(set(range(0, 15)) - set(likelihood_cols))
-    coord_names = ['x_Nose','y_Nose',
-                   'x_Left_Ear','y_Left_Ear',
-                   'x_Right_Ear','y_Right_Ear',
-                   'x_Left_Paw','y_Left_Paw',
-                   'x_Right_Paw','y_Right_Paw']
-    marker_names = ['nose', 'left_ear', 'right_ear', 'left_paw', 'right_paw']
-    plot_trajectories(normalize_wrt_frame_center(dataset[:, coord_cols]), coord_names=coord_names)
-    # plot_points_and_time(dataset[500:1000, coord_cols], )
-    plot_points_and_time(normalize_wrt_frame_center(dataset[500:1000, coord_cols]), marker_names)
+    dataset_path = "..\\data\\test_dataset.csv"
+    plot_center_evolution(dataset_path)
+    # dataset = np.loadtxt("..\\train_dataset.csv", skiprows=1, delimiter=',')
+    # likelihood_cols = [2,5,8,11,14]
+    # coord_cols = list(set(range(0, 15)) - set(likelihood_cols))
+    # coord_names = ['x_Nose','y_Nose',
+    #                'x_Left_Ear','y_Left_Ear',
+    #                'x_Right_Ear','y_Right_Ear',
+    #                'x_Left_Paw','y_Left_Paw',
+    #                'x_Right_Paw','y_Right_Paw']
+    # marker_names = ['nose', 'left_ear', 'right_ear', 'left_paw', 'right_paw']
+    # plot_trajectories(normalize_wrt_frame_center(dataset[:, coord_cols]), coord_names=coord_names)
+    # # plot_points_and_time(dataset[500:1000, coord_cols], )
+    # plot_points_and_time(normalize_wrt_frame_center(dataset[500:1000, coord_cols]), marker_names)
