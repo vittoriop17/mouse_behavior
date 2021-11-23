@@ -152,6 +152,7 @@ class DecoderLSTM(nn.Module):
 class Net(nn.Module):
     def __init__(self, args, bidirectional=True, override_input_size=None):
         super(Net, self).__init__()
+        self.multitask = args.multitask
         self.bidirectional = bidirectional
         self.D = 2 if self.bidirectional else 1
         self.sequence_length = getattr(args, "sequence_length", SEQ_LENGTH)
@@ -163,7 +164,6 @@ class Net(nn.Module):
         self.encoder = EncoderLSTM(args, override_input_size=override_input_size)
         self.dec_input_size = self.encoder.output_size
         self.attention_behavior = Attention(self.D*self.hidden_size)
-        self.attention_denoising = Attention(self.D*self.hidden_size)
         self.decoder_behavior = nn.LSTMCell(input_size=self.dec_input_size, hidden_size=self.D*self.hidden_size,
                                             device=self.device)
         self.fc_behavior = nn.Sequential(nn.Linear(in_features=self.D*self.hidden_size, out_features=50,
@@ -172,13 +172,15 @@ class Net(nn.Module):
                                          nn.Linear(in_features=50, out_features=self.n_behaviors,
                                                    device=self.device),
                                          nn.LogSoftmax(dim=-1))
-        self.decoder_denoising = nn.LSTMCell(input_size=self.dec_input_size, hidden_size=self.D*self.hidden_size,
-                                             device=self.device)
-        self.fc_denoising = nn.Sequential(nn.Linear(in_features=self.D*self.hidden_size, out_features=100,
-                                                    device=self.device),
-                                          nn.ReLU(),
-                                          nn.Linear(in_features=100, out_features=2*self.n_markers,
-                                                    device=self.device))
+        if self.multitask:
+            self.attention_denoising = Attention(self.D*self.hidden_size)
+            self.decoder_denoising = nn.LSTMCell(input_size=self.dec_input_size, hidden_size=self.D*self.hidden_size,
+                                                 device=self.device)
+            self.fc_denoising = nn.Sequential(nn.Linear(in_features=self.D*self.hidden_size, out_features=100,
+                                                        device=self.device),
+                                              nn.ReLU(),
+                                              nn.Linear(in_features=100, out_features=2*self.n_markers,
+                                                        device=self.device))
 
     def forward(self, x):
         batch_size = x.shape[0]
@@ -189,7 +191,7 @@ class Net(nn.Module):
         decoded_behavior_sequence = []
         decoded_trajectory_sequence = None
         trajectory_sequence = None
-        if self.encoder.training:
+        if self.encoder.training and self.multitask:
             query_denoising = torch.zeros((batch_size, self.D*self.hidden_size), device=self.device, dtype=torch.float32)
             c_i_denoising = torch.zeros((batch_size, self.D*self.hidden_size), device=self.device, dtype=torch.float32)
             decoded_trajectory_sequence = []
@@ -202,7 +204,7 @@ class Net(nn.Module):
             query = torch.squeeze(query, dim=1)
             query, c_i = self.decoder_behavior(out_attn, (query, c_i))
             decoded_behavior_sequence.append(query)
-            if self.encoder.training:  # Predict also the de-noised trajectory
+            if self.encoder.training and self.multitask:  # Predict also the de-noised trajectory
                 query_denoising = torch.unsqueeze(query_denoising, dim=1)
                 out_attn_denoising, attn_w_denoising = self.attention_denoising(context=out_enc, query=query_denoising)
                 out_attn_denoising = torch.squeeze(out_attn_denoising, dim=1)
@@ -213,7 +215,7 @@ class Net(nn.Module):
 
         decoded_behavior_sequence = torch.cat([torch.unsqueeze(h, dim=1) for h in decoded_behavior_sequence], dim=1)
         behavior_sequence = self.fc_behavior(decoded_behavior_sequence)
-        if self.encoder.training:
+        if self.encoder.training and self.multitask:
             decoded_trajectory_sequence = torch.cat([torch.unsqueeze(h, dim=1) for h in decoded_trajectory_sequence], dim=1)
             trajectory_sequence = self.fc_denoising(decoded_trajectory_sequence)
         # [N, seq_length, n_behaviors], [N, seq_length, n_markers*self.wl] or None, if not training

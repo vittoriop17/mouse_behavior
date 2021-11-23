@@ -143,13 +143,16 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
             # each element in target has to have 0 <= value < C (target is the ground truth)
             classification_loss = \
                 classification_criterion(pred_behaviors.view(-1, args.n_behaviors), batch_behaviors.view(-1, ))
-            denoising_loss = \
-                denoising_criterion(pred_trajectories, batch_sequences[:, :, coord_cols], batch_likelihoods)
-            multi_task_loss = alpha * classification_loss + (1 - alpha) * denoising_loss
+            if args.multitask:
+                denoising_loss = \
+                    denoising_criterion(pred_trajectories, batch_sequences[:, :, coord_cols], batch_likelihoods)
+                multi_task_loss = alpha * classification_loss + (1 - alpha) * denoising_loss
+                train_batch_denoising_losses.append(denoising_loss.item())
+            else:
+                multi_task_loss = classification_loss
             multi_task_loss.backward()
             optimizer.step()
             train_batch_classification_losses.append(classification_loss.item())
-            train_batch_denoising_losses.append(denoising_loss.item())
             # Collapse predictions by frame id (remember: same frame may be in several sequences --> then, collapse)
             train_frame_pred_accumulator = collapse_predictions(pred_behaviors, batch_frame_ids, train_frame_pred_accumulator)
         test_batch_classification_losses = []
@@ -168,10 +171,12 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
         te = time.time()
         train_classification_loss = np.mean(train_batch_classification_losses)
         test_classification_loss = np.mean(test_batch_classification_losses)
-        train_denoising_loss = np.mean(train_batch_denoising_losses)
+        if args.multitask:
+            train_denoising_loss = np.mean(train_batch_denoising_losses)
+            history['train_denoising_losses'].append(train_denoising_loss)
+            print(f"\tDENOISING:\t\t train loss: {train_denoising_loss}")
         history['train_classification_losses'].append(train_classification_loss)
         history['test_classification_losses'].append(test_classification_loss)
-        history['train_denoising_losses'].append(train_denoising_loss)
         history['train_f1_score'].append(f1_score(train_true_behaviors, train_frame_pred_accumulator.argmax(axis=-1), average=None))
         history['test_f1_score'].append(f1_score(test_true_behaviors, test_frame_pred_accumulator.argmax(axis=-1), average=None))
         history['micro_train_f1_score'].append(f1_score(train_true_behaviors, train_frame_pred_accumulator.argmax(axis=-1), average="micro"))
@@ -180,8 +185,7 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
               f"\tCLASSIFICATION:\t\t train loss: {train_classification_loss}  "
               f"test loss: {test_classification_loss} \n"
               f"\tCLASSIFICATION MICRO F1 score: \t train: {history['train_f1_score'][-1]}  "
-              f"test: {history['test_f1_score'][-1]}\n"
-              f"\tDENOISING:\t\t train loss: {train_denoising_loss}")
+              f"test: {history['test_f1_score'][-1]}\n")
         wandb.log({'test_grooming_f1_score': history['test_f1_score'][-1][0]})
         if history["best_grooming_f1_score"] < history['test_f1_score'][-1][0]:
             history["best_grooming_f1_score"] = history['test_f1_score'][-1][0]

@@ -18,5 +18,6 @@
   "train": "True",
   "with_conv": "False",
   "alpha": 0.5,
-  "preprocess": "None"
+  "preprocess": "None",
+  "multitask": "False"
 }
