@@ -170,7 +170,7 @@ def load_existing_model(model, optimizer, checkpoint_path):
     try:
         print(f"Trying to load existing model from checkpoint @ {checkpoint_path}...")
         checkpoint = torch.load(checkpoint_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
-        model.load_state_dict(checkpoint['model_state_dict'])
+        model.load_state_dict(checkpoint['model_state_dict']) if hasattr(checkpoint, "model_state_dict") else model.load_state_dict(checkpoint)
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         print("...existing model loaded")
         max_test_f1_score = getattr(checkpoint, "max_test_f1_score", 0)

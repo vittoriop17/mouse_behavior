@@ -72,7 +72,7 @@ def train_wrapper(args):
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
     if getattr(args, "load_model", False) and getattr(args, "checkpoint_path", False):
         try:
-            model = load_existing_model(model, optimizer, checkpoint_path=args.checkpoint_path)
+            load_existing_model(model, optimizer, checkpoint_path=args.checkpoint_path)
         except Exception as e:
             print(f"During loading the model, the following exception occured: {e}")
             print("The execution will continue anyway")
