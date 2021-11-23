@@ -20,6 +20,8 @@ def upload_args(file_path="config.json"):
     parser.add_argument("--video", required=False, type=str, help="Video path. Video used for evaluation of results")
     parser.add_argument("--multitask", required=False, type=bool, help="Training the multitask network or the classificatio network")
     parser.add_argument("--train_dataset_path", required=False, type=str, help="Train dataset path.")
+    parser.add_argument("--checkpoint_path", required=False, type=str, help="path to checkpoint")
+    parser.add_argument("--load_model", required=False, type=bool, help="Specify if load an existing model or not. If 'True', checkpoint_path must be specified as well")
     parser.add_argument("--test_dataset_path", required=False, type=str, help="Test dataset path.")
     parser.add_argument("--preprocess", required=False, type=str, help="Possible options: "
                                                                        "recenter: apply centering by frame and normalization by coordinate "
