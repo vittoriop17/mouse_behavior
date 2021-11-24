@@ -21,6 +21,7 @@ def test_model(checkpoint_path, args):
     model = new_lstm.Net(args)
     checkpoint = torch.load(checkpoint_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
     model.load_state_dict(checkpoint['model_state_dict'])
+    model = model.to(args.device)
     test_dataset = MarkersDataset(args, train=False)
     test_dl = DataLoader(test_dataset, batch_size=64)
     all_predictions = np.zeros((test_dataset.dataset.shape[0], args.n_behaviors))
@@ -178,7 +179,7 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
               f"test: {history['test_f1_score'][-1]}\n")
         if args.device != 'cpu':
             wandb.log({'test_grooming_f1_score': history['test_f1_score'][-1][0]})
-        if history["best_grooming_f1_score"] < history['test_f1_score'][-1][0]:
+        if history["best_grooming_f1_score"] < history['test_f1_score'][-1][0] and getattr(args, "load_model", False):
             previous_best_score = history["best_grooming_f1_score"]
             current_best_score = history['test_f1_score'][-1][0]
             print(f"SAVING CURRENT MODEL ...")
