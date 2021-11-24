@@ -97,6 +97,7 @@ def collapse_predictions(batch_pred_behaviors: torch.tensor, batch_frame_ids, ac
 def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord_cols, alpha=0.5):
     checkpoint_path = args.checkpoint_path if getattr(args, "checkpoint_path", None) is not None else "checkpoint_path"
     flag_checkpoint = False
+    print(f"EXPERIMENT {args.name} IS STARTING...")
     if getattr(args, "device", "cpu") is not "cpu":
         wandb.init(project="mouse_project", entity="vittoriop", config=args.__dict__)
         wandb.watch(model)
