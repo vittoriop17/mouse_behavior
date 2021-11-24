@@ -99,7 +99,7 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
     flag_checkpoint = False
     print(f"EXPERIMENT {args.name} IS STARTING...")
     if getattr(args, "device", "cpu") is not "cpu":
-        wandb.init(project="mouse_project", entity="vittoriop", config=args.__dict__)
+        wandb.init(project="mouse_project", entity="vittoriop", name=args.name, config=args.__dict__)
         wandb.watch(model)
     n_epochs = getattr(args, 'n_epochs')
     model.train()
