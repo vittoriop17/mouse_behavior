@@ -2,12 +2,15 @@
   "file_path": "D:\\UNIVERSITA\\KTH\\Semestre 1\\Project Course in Data Science\\CODE\\data\\video_4DLC_resnet101_For_Video_October14Oct14shuffle1_111600.csv",
   "input_size": 24,
   "hidden_size": 150,
+  "threshold": 0.5,
+  "stride": 0.75,
+  "sequence_length": 100,
   "num_layers": 1,
   "lr": 1e-4,
   "batch_size": 64,
   "n_epochs": 100,
-  "train_dataset_path": "D:\\UNIVERSITA\\KTH\\Semestre 1\\Project Course in Data Science\\CODE\\data\\train_1h16min_right.csv",
-  "test_dataset_path": "D:\\UNIVERSITA\\KTH\\Semestre 1\\Project Course in Data Science\\CODE\\data\\test_22min_front.csv",
+  "train_dataset_path": "D:\\UNIVERSITA\\KTH\\Semestre 1\\Project Course in Data Science\\CODE\\data\\trajectories_with_behavior\\test_dataset.csv",
+  "test_dataset_path": "D:\\UNIVERSITA\\KTH\\Semestre 1\\Project Course in Data Science\\CODE\\data\\trajectories_with_behavior\\test_dataset.csv",
   "n_behaviors": 2,
   "n_markers": 8,
   "dropout": 0.3,
@@ -16,5 +19,6 @@
   "with_conv": "False",
   "alpha": 0.5,
   "preprocess": "None",
-  "multitask": "False"
+  "multitask": "False",
+  "name": "prova"
 }

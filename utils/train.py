@@ -95,7 +95,7 @@ def collapse_predictions(batch_pred_behaviors: torch.tensor, batch_frame_ids, ac
 
 
 def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord_cols, alpha=0.5):
-    checkpoint_path = getattr(args, "checkpoint_path", "checkpoint.pt")
+    checkpoint_path = args.checkpoint_path if getattr(args, "checkpoint_path", None) is not None else "checkpoint_path"
     flag_checkpoint = False
     if getattr(args, "device", "cpu") is not "cpu":
         wandb.init(project="mouse_project", entity="vittoriop", config=args.__dict__)
@@ -188,7 +188,8 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
               f"test loss: {test_classification_loss} \n"
               f"\tCLASSIFICATION MICRO F1 score: \t train: {history['train_f1_score'][-1]}  "
               f"test: {history['test_f1_score'][-1]}\n")
-        wandb.log({'test_grooming_f1_score': history['test_f1_score'][-1][0]})
+        if args.device != 'cpu':
+            wandb.log({'test_grooming_f1_score': history['test_f1_score'][-1][0]})
         if history["best_grooming_f1_score"] < history['test_f1_score'][-1][0]:
             previous_best_score = history["best_grooming_f1_score"]
             current_best_score = history['test_f1_score'][-1][0]
@@ -208,7 +209,7 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
             }, checkpoint_path)
             history["best_grooming_f1_score"] = history['test_f1_score'][-1][0]
             flag_checkpoint = True
-        if getattr(args, "device", "cpu") is not "cpu":
+        if getattr(args, "device", "cpu") != "cpu":
             log_all_losses(history)
     if flag_checkpoint:
         checkpoint = torch.load(checkpoint_path, map_location="cuda" if torch.cuda.is_available() else "cpu")

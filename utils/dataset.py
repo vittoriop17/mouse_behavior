@@ -371,4 +371,13 @@ if __name__ == '__main__':
     file_behavior = "..\\data\\only_behavior_labels\\behavior_labels_22min_right.csv"
     file_trajectories = "..\\data\\trajectories_without_behavior\\trajectories_22min_right.csv"
     # save_trajectories_from_dlc(file_trajectories)
-    merge_behavior_and_trajectories(file_behavior, file_trajectories, save_custom_frames=False)
+    # merge_behavior_and_trajectories(file_behavior, file_trajectories, save_custom_frames=False)
+    train_path = "..\\data\\trajectories_with_behavior\\train_dataset.csv"
+    test_path = "..\\data\\trajectories_with_behavior\\test_dataset.csv"
+    # df_train = pd.read_csv(train_path)
+    # df_test = pd.read_csv(test_path)
+    # df_train.label[df_train.label == 2] = 1
+    # df_test.label[df_test.label == 2] = 1
+    # df_train.to_csv(path_or_buf=train_path, header=df_train.columns, index=False)
+    # df_test.to_csv(path_or_buf=test_path, header=df_test.columns, index=False)
+    #
