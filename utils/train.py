@@ -69,7 +69,7 @@ def train_wrapper(args):
     setattr(args, "device", device)
     train_dataloader, test_dataloader, coord_cols = train_test_dataloader(args)
     model = new_lstm.Net_w_conv(args) if args.with_conv else new_lstm.Net(args)
-    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4)
     if getattr(args, "load_model", False) and getattr(args, "checkpoint_path", False):
         try:
             load_existing_model(model, optimizer, checkpoint_path=args.checkpoint_path)
@@ -95,6 +95,8 @@ def collapse_predictions(batch_pred_behaviors: torch.tensor, batch_frame_ids, ac
 
 
 def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord_cols, alpha=0.5):
+    checkpoint_path = getattr(args, "checkpoint_path", "checkpoint.pt")
+    flag_checkpoint = False
     if getattr(args, "device", "cpu") is not "cpu":
         wandb.init(project="mouse_project", entity="vittoriop", config=args.__dict__)
         wandb.watch(model)
@@ -188,10 +190,57 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
               f"test: {history['test_f1_score'][-1]}\n")
         wandb.log({'test_grooming_f1_score': history['test_f1_score'][-1][0]})
         if history["best_grooming_f1_score"] < history['test_f1_score'][-1][0]:
+            previous_best_score = history["best_grooming_f1_score"]
+            current_best_score = history['test_f1_score'][-1][0]
+            print(f"SAVING CURRENT MODEL ...")
+            print(f"Previous best grooming F1-score: {previous_best_score},"
+                  f"\tCurrent best F1-score: {current_best_score}")
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'best_grooming_f1_score': current_best_score,
+                'args': args,
+                'all_train_f1_scores_by_class': history['train_f1_score'],
+                'all_test_f1_scores_by_class': history['test_f1_score'],
+                'all_train_f1_scores': history['micro_train_f1_score'],
+                'all_test_f1_scores': history['micro_test_f1_score']
+            }, checkpoint_path)
             history["best_grooming_f1_score"] = history['test_f1_score'][-1][0]
-            torch.save(model.state_dict(), "checkpoint.pt")
+            flag_checkpoint = True
         if getattr(args, "device", "cpu") is not "cpu":
             log_all_losses(history)
+    if flag_checkpoint:
+        checkpoint = torch.load(checkpoint_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
+        best_model = checkpoint['model_state_dict']
+        best_score = checkpoint['best_grooming_f1_score']
+        epoch = checkpoint['epoch']
+        print(f"SAVING FINAL MODEL ...")
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': best_model,
+            'optimizer_state_dict': optimizer.state_dict(),
+            'best_grooming_f1_score': best_score,
+            'args': args,
+            'all_train_f1_scores_by_class': history['train_f1_score'],
+            'all_test_f1_scores_by_class': history['test_f1_score'],
+            'all_train_f1_scores': history['micro_train_f1_score'],
+            'all_test_f1_scores': history['micro_test_f1_score']
+        }, checkpoint_path)
+    else:
+        current_score = history['test_f1_score'][-1][0]
+        print(f"SAVING FINAL MODEL ...")
+        torch.save({
+            'epoch': n_epochs,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'best_grooming_f1_score': current_score,
+            'args': args,
+            'all_train_f1_scores_by_class': history['train_f1_score'],
+            'all_test_f1_scores_by_class': history['test_f1_score'],
+            'all_train_f1_scores': history['micro_train_f1_score'],
+            'all_test_f1_scores': history['micro_test_f1_score']
+        }, checkpoint_path)
     print(f"BEST GROOMING F1 SCORE: {history['best_grooming_f1_score']}")
     return model.eval(), history
 

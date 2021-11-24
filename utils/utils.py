@@ -9,6 +9,9 @@ import torch
 
 def upload_args(file_path="config.json"):
     parser = argparse.ArgumentParser(description=f'Arguments from json')
+    parser.add_argument("--name", required=True, type=str, help="Name of the experiment "
+                                                                "(e.g.: 'evaluate preprocessing: recenter_wrt_frame' or"
+                                                                " 'test sequence length: 300')")
     parser.add_argument("--n_epochs", required=False, type=int, help="Number of epochs")
     parser.add_argument("--input_size", required=False, type=int, help="Input size of a singular time sample")
     parser.add_argument("--hidden_size", required=False, type=int)
