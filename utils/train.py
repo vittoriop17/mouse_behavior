@@ -200,7 +200,7 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
             flag_checkpoint = True
         if getattr(args, "device", "cpu") != "cpu":
             log_all_losses(history)
-    if flag_checkpoint:
+    if flag_checkpoint and getattr(args, "save_model", False):
         checkpoint = torch.load(checkpoint_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
         best_model = checkpoint['model_state_dict']
         best_score = checkpoint['best_grooming_f1_score']
