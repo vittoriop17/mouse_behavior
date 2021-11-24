@@ -15,41 +15,28 @@ import pandas as pd
 # TODO - plot center movement (in function of time)
 
 
-def denoise_trajectories_from_checkpoint(checkpoint_path, args):
+def test_model(checkpoint_path, args):
     setattr(args, "stride", 1)
-    setattr(args, "device", "cpu")
+    setattr(args, "device", "cuda" if torch.cuda.is_available() else "cpu")
     model = new_lstm.Net(args)
     checkpoint = torch.load(checkpoint_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
     model.load_state_dict(checkpoint)
-    train_dataset = MarkersDataset(args)
-    setattr(args, "train", False)
     test_dataset = MarkersDataset(args, train=False)
-    train_dl, test_dl = DataLoader(train_dataset, batch_size=64), DataLoader(test_dataset, batch_size=64)
-    train_denoised = torch.zeros((train_dataset.dataset.shape[0], 16), requires_grad=False)
-    train_classes = torch.zeros((train_dataset.dataset.shape[0],), dtype=torch.long, requires_grad=False)
-    test_denoised = torch.zeros((test_dataset.dataset.shape[0], 16), requires_grad=False)
-    test_classes = torch.zeros((test_dataset.dataset.shape[0],), dtype=torch.long, requires_grad=False)
-    for (batch_frame_ids, batch_sequences, _, batch_classes) in train_dl:
-        pred_behaviors, pred_trajectories = model(batch_sequences)
-        for relative_idx, frame_idx in enumerate(batch_frame_ids):
-            frame_idx = frame_idx.detach().numpy()
-            train_denoised[frame_idx] = pred_trajectories[relative_idx]
-            train_classes[frame_idx] = batch_classes[relative_idx].view(-1,)
-
+    test_dl = DataLoader(test_dataset, batch_size=64)
+    all_predictions = np.zeros((test_dataset.dataset.shape[0], args.n_behaviors))
+    test_true_behaviors = test_dataset.get_all_classes()
     for (batch_frame_ids, batch_sequences, batch_classes) in test_dl:
-        pred_behaviors, pred_trajectories = model(batch_sequences)
-        for relative_idx, frame_idx in enumerate(batch_frame_ids):
-            frame_idx = frame_idx.detach().numpy()
-            test_denoised[frame_idx] = pred_trajectories[relative_idx]
-            test_classes[frame_idx] = batch_classes[relative_idx].view(-1,)
-    test_denoised = torch.cat((test_denoised, test_classes), dim=-1)
-    test_denoised = test_denoised.detach().numpy()
-    train_denoised = torch.cat((train_denoised, train_classes), dim=-1)
-    train_denoised = train_denoised.detach().numpy()
-    columns = list(train_dataset.columns[train_dataset.cols_coords])
-    columns.extend(train_dataset.columns[train_dataset.col_class])
-    np.savetxt("train_denoised_dataset.csv", train_denoised, delimiter=',', header=columns)
-    np.savetxt("test_denoised_dataset.csv", test_denoised, delimiter=',', header=columns)
+        (batch_frame_ids, batch_sequences, batch_behaviors) = \
+            (batch_frame_ids.to(args.device), batch_sequences.to(args.device), batch_classes.to(args.device))
+        pred_behaviors, _ = model(batch_sequences)
+        # Collapse predictions by frame id (remember: same frame may be in several sequences --> then, collapse)
+        all_predictions = collapse_predictions(pred_behaviors, batch_frame_ids, all_predictions)
+    all_predictions = all_predictions.argmax(axis=-1)
+    test_f1_score_by_class = f1_score(test_true_behaviors, all_predictions, average=None)
+    micro_test_f1_score = f1_score(test_true_behaviors, all_predictions, average="micro")
+    print(f"TEST RESULTS: \n"
+          f"\tMicro f1 score: {micro_test_f1_score}\n"
+          f"\tGrooming/non-grooming f1 scores: {test_f1_score_by_class}\,")
 
 
 def train_test_dataloader(args):
@@ -251,3 +238,5 @@ def log_all_losses(history):
     for k, v in history.items():
         if isinstance(v, list) and len(v)>0:
             wandb.log({k: v[-1]})
+
+
