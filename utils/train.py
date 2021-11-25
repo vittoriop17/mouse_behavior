@@ -303,10 +303,11 @@ def only_train_model(model, optimizer, train_dataloader, args, coord_cols, alpha
             else:
                 multi_task_loss = classification_loss
             multi_task_loss.backward()
-            scheduler.step()
+            optimizer.step()
             train_batch_classification_losses.append(classification_loss.item())
             # Collapse predictions by frame id (remember: same frame may be in several sequences --> then, collapse)
             train_frame_pred_accumulator = collapse_predictions(pred_behaviors, batch_frame_ids, train_frame_pred_accumulator)
+        scheduler.step()
         te = time.time()
         train_classification_loss = np.mean(train_batch_classification_losses)
         if args.multitask:
