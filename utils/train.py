@@ -334,7 +334,7 @@ def only_train_model(model, optimizer, train_dataloader, args, coord_cols, alpha
                 'all_train_f1_scores_by_class': history['train_f1_score'],
                 'all_train_f1_scores': history['micro_train_f1_score']
             }, checkpoint_path)
-            history["best_train_grooming_f1_score"] = history['test_f1_score'][-1][0]
+            history["best_train_grooming_f1_score"] = history['train_f1_score'][-1][0]
             flag_checkpoint = True
         if getattr(args, "device", "cpu") != "cpu":
             log_all_losses(history)
