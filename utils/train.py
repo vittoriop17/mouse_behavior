@@ -18,7 +18,7 @@ import pandas as pd
 def test_model(checkpoint_path, args):
     setattr(args, "stride", 1)
     setattr(args, "device", "cuda" if torch.cuda.is_available() else "cpu")
-    model = new_lstm.Net(args)
+    model = new_lstm.Net_w_conv(args) if args.with_conv else new_lstm.Net(args)
     checkpoint = torch.load(checkpoint_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
     model.load_state_dict(checkpoint['model_state_dict'])
     model = model.to(args.device)
