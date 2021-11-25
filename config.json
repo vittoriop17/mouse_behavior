@@ -20,5 +20,6 @@
   "alpha": 0.5,
   "preprocess": "None",
   "multitask": "False",
-  "name": "prova"
+  "name": "prova",
+  "train_only": "False"
 }

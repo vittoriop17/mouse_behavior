@@ -1,12 +1,12 @@
 import torch
 from torch.utils.data import DataLoader, random_split
 from utils.dataset import MarkersDataset
-from utils.utils import load_existing_model
+from utils.utils import load_existing_model, save_confusion_matrix
 from model.simple_lstm import *
 import time
 import numpy as np
 from model import new_lstm
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, confusion_matrix
 from utils.loss import weighted_mse
 import wandb
 import pandas as pd
@@ -37,7 +37,9 @@ def test_model(checkpoint_path, args):
     micro_test_f1_score = f1_score(test_true_behaviors, all_predictions, average="micro")
     print(f"TEST RESULTS: \n"
           f"\tMicro f1 score: {micro_test_f1_score}\n"
-          f"\tGrooming/non-grooming f1 scores: {test_f1_score_by_class}\,")
+          f"\tGrooming/non-grooming f1 scores: {test_f1_score_by_class}")
+    save_confusion_matrix(y_true=test_true_behaviors, y_pred=all_predictions,
+                          classes=['grooming', 'non-grooming'], name_method="LSTM-based architecture")
 
 
 def train_test_dataloader(args):
@@ -65,7 +67,14 @@ def train_wrapper(args):
             print(f"During loading the model, the following exception occured: {e}")
             print("The execution will continue anyway")
     model = model.to(args.device)
-    model, history = train_model(model, optimizer, train_dataloader, test_dataloader, args, coord_cols=coord_cols, alpha=alpha)
+    if getattr(args, "train_only", False):
+        model, history = only_train_model(model, optimizer, train_dataloader, args,
+                                          coord_cols=coord_cols, alpha=alpha)
+        test_model(args.checkpoint_path, args)
+
+    else:
+        model, history = train_evaluation_model(model, optimizer, train_dataloader, test_dataloader, args,
+                                                coord_cols=coord_cols, alpha=alpha)
 
 
 def collapse_predictions(batch_pred_behaviors: torch.tensor, batch_frame_ids, accumulator):
@@ -82,10 +91,11 @@ def collapse_predictions(batch_pred_behaviors: torch.tensor, batch_frame_ids, ac
     return accumulator
 
 
-def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord_cols, alpha=0.5):
+def train_evaluation_model(model, optimizer, train_dataloader, test_dataloader, args, coord_cols, alpha=0.5):
     checkpoint_path = args.checkpoint_path if getattr(args, "checkpoint_path", None) is not None else "checkpoint_path"
     flag_checkpoint = False
-    print(f"EXPERIMENT {args.name} IS STARTING...")
+    print(f"TRAIN + EVALUATION  IS STARTING...\n"
+          f"Experiment: {args.name}")
     if getattr(args, "device", "cpu") is not "cpu":
         wandb.init(project="mouse_project", entity="vittoriop", name=args.name, config=args.__dict__)
         wandb.watch(model)
@@ -179,7 +189,7 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
               f"test: {history['test_f1_score'][-1]}\n")
         if args.device != 'cpu':
             wandb.log({'test_grooming_f1_score': history['test_f1_score'][-1][0]})
-        if history["best_grooming_f1_score"] < history['test_f1_score'][-1][0] and getattr(args, "load_model", False):
+        if history["best_grooming_f1_score"] < history['test_f1_score'][-1][0] and getattr(args, "save_model", False):
             previous_best_score = history["best_grooming_f1_score"]
             current_best_score = history['test_f1_score'][-1][0]
             print(f"SAVING CURRENT MODEL ...")
@@ -200,7 +210,7 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
             flag_checkpoint = True
         if getattr(args, "device", "cpu") != "cpu":
             log_all_losses(history)
-    if flag_checkpoint and getattr(args, "save_model", False):
+    if flag_checkpoint:
         checkpoint = torch.load(checkpoint_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
         best_model = checkpoint['model_state_dict']
         best_score = checkpoint['best_grooming_f1_score']
@@ -217,7 +227,7 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
             'all_train_f1_scores': history['micro_train_f1_score'],
             'all_test_f1_scores': history['micro_test_f1_score']
         }, checkpoint_path)
-    else:
+    elif getattr(args, "save_model", False):
         current_score = history['test_f1_score'][-1][0]
         print(f"SAVING FINAL MODEL ...")
         torch.save({
@@ -232,6 +242,130 @@ def train_model(model, optimizer, train_dataloader, test_dataloader, args, coord
             'all_test_f1_scores': history['micro_test_f1_score']
         }, checkpoint_path)
     print(f"BEST GROOMING F1 SCORE: {history['best_grooming_f1_score']}")
+    return model.eval(), history
+
+
+def only_train_model(model, optimizer, train_dataloader, args, coord_cols, alpha=0.5):
+    checkpoint_path = args.checkpoint_path if getattr(args, "checkpoint_path", None) is not None else "checkpoint_path"
+    flag_checkpoint = False
+    print(f"TRAIN ONLY IS STARTING...\n"
+          f"Experiment: {args.name} ")
+    if getattr(args, "device", "cpu") is not "cpu":
+        wandb.init(project="mouse_project", entity="vittoriop", name=args.name, config=args.__dict__)
+        wandb.watch(model)
+    n_epochs = getattr(args, 'n_epochs')
+    model.train()
+    classification_criterion = nn.NLLLoss(weight=torch.tensor([0.9, 0.1])).to(args.device)  # nn.MSELoss().to(args.device)
+    denoising_criterion = weighted_mse  # nn.MSELoss().to(args.device)  # nn.MSELoss().to(args.device)
+
+    history = dict(train_classification_losses=[],
+                   train_denoising_losses=[],
+                   train_f1_score=[],
+                   micro_train_f1_score=[],
+                   train_grooming_f1_score=[],
+                   best_train_grooming_f1_score=0)
+    # *_dataloader.dataset.dataset.shape[0] represents the whole number of frames inside the respective
+    # dataloader (train or test). This value is necessary in order to collapse different predictions for the same frame
+    n_train_frames = train_dataloader.dataset.dataset.shape[0]
+    # train_true_behaviors shape: [n_train_frames, 1]
+    train_true_behaviors = train_dataloader.dataset.get_all_classes()
+    for epoch in range(1, n_epochs + 1):
+        train_frame_pred_accumulator = np.zeros((n_train_frames, args.n_behaviors))
+        model = model.train()
+        ts = time.time()
+        train_batch_classification_losses, train_batch_denoising_losses = [], []
+        for (batch_frame_ids, batch_sequences, batch_likelihoods, batch_behaviors) in train_dataloader:
+            # shapes: (where N=BATCH_SIZE
+            # batch_frame_ids: [N, SEQ_LENGTH, 1]
+            # batch_sequences: [N, SEQ_LENGTH, INPUT_SIZE]
+            # batch_likelihoods: [N, SEQ_LENGTH, n_markers] ---> n_markers=input_size/3 (input: x,y,L for each marker)
+            # batch_behaviors: [N, SEQ_LENGTH, 1]
+            optimizer.zero_grad()
+            # prepare input
+            (batch_frame_ids, batch_sequences, batch_likelihoods, batch_behaviors) = \
+                (batch_frame_ids.to(args.device), batch_sequences.to(args.device),
+                 batch_likelihoods.to(args.device), batch_behaviors.to(args.device))
+            # Predict behaviors and denoised trajectories
+            pred_behaviors, pred_trajectories = model(batch_sequences)
+
+            # Remember, this is a MULTI-TASK network.
+            # The two losses are evaluated only during training
+            # each element in target has to have 0 <= value < C (target is the ground truth)
+            classification_loss = \
+                classification_criterion(pred_behaviors.view(-1, args.n_behaviors), batch_behaviors.view(-1, ))
+            if args.multitask:
+                denoising_loss = \
+                    denoising_criterion(pred_trajectories, batch_sequences[:, :, coord_cols], batch_likelihoods)
+                multi_task_loss = alpha * classification_loss + (1 - alpha) * denoising_loss
+                train_batch_denoising_losses.append(denoising_loss.item())
+            else:
+                multi_task_loss = classification_loss
+            multi_task_loss.backward()
+            optimizer.step()
+            train_batch_classification_losses.append(classification_loss.item())
+            # Collapse predictions by frame id (remember: same frame may be in several sequences --> then, collapse)
+            train_frame_pred_accumulator = collapse_predictions(pred_behaviors, batch_frame_ids, train_frame_pred_accumulator)
+        te = time.time()
+        train_classification_loss = np.mean(train_batch_classification_losses)
+        if args.multitask:
+            train_denoising_loss = np.mean(train_batch_denoising_losses)
+            history['train_denoising_losses'].append(train_denoising_loss)
+            print(f"\tDENOISING:\t\t train loss: {train_denoising_loss}")
+        history['train_classification_losses'].append(train_classification_loss)
+        history['train_f1_score'].append(f1_score(train_true_behaviors, train_frame_pred_accumulator.argmax(axis=-1), average=None))
+        history['micro_train_f1_score'].append(f1_score(train_true_behaviors, train_frame_pred_accumulator.argmax(axis=-1), average="micro"))
+        print(f"Epoch: {epoch}  \t(time: {te - ts} )\n"
+              f"\tCLASSIFICATION:\t\t train loss: {train_classification_loss}  "
+              f"\tCLASSIFICATION MICRO F1 score: \t train: {history['train_f1_score'][-1]}  ")
+        if args.device != 'cpu':
+            wandb.log({'train_grooming_f1_score': history['train_f1_score'][-1][0]})
+        if history["best_train_grooming_f1_score"] < history['train_f1_score'][-1][0] and getattr(args, "save_model", False):
+            previous_best_score = history["best_train_grooming_f1_score"]
+            current_best_score = history['train_f1_score'][-1][0]
+            print(f"SAVING CURRENT MODEL ...")
+            print(f"Previous best TRAIN grooming F1-score: {previous_best_score},"
+                  f"\tCurrent best TRAIN grooming F1-score: {current_best_score}")
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'best_train_grooming_f1_score': current_best_score,
+                'args': args,
+                'all_train_f1_scores_by_class': history['train_f1_score'],
+                'all_train_f1_scores': history['micro_train_f1_score']
+            }, checkpoint_path)
+            history["best_train_grooming_f1_score"] = history['test_f1_score'][-1][0]
+            flag_checkpoint = True
+        if getattr(args, "device", "cpu") != "cpu":
+            log_all_losses(history)
+    if flag_checkpoint:
+        checkpoint = torch.load(checkpoint_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
+        best_model = checkpoint['model_state_dict']
+        best_score = checkpoint['best_train_grooming_f1_score']
+        epoch = checkpoint['epoch']
+        print(f"SAVING FINAL MODEL ...")
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': best_model,
+            'optimizer_state_dict': optimizer.state_dict(),
+            'best_train_grooming_f1_score': best_score,
+            'args': args,
+            'all_train_f1_scores_by_class': history['train_f1_score'],
+            'all_train_f1_scores': history['micro_train_f1_score']
+        }, checkpoint_path)
+    elif getattr(args, "save_model", False):
+        current_score = history['train_f1_score'][-1][0]
+        print(f"SAVING FINAL MODEL ...")
+        torch.save({
+            'epoch': n_epochs,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'best_train_grooming_f1_score': current_score,
+            'args': args,
+            'all_train_f1_scores_by_class': history['train_f1_score'],
+            'all_train_f1_scores': history['micro_train_f1_score']
+        }, checkpoint_path)
+    print(f"BEST GROOMING F1 SCORE: {history['best_train_grooming_f1_score']}")
     return model.eval(), history
 
 

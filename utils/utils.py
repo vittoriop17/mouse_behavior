@@ -5,6 +5,9 @@ import cv2
 import numpy as np
 import h5py
 import torch
+from sklearn.metrics import confusion_matrix, f1_score
+import matplotlib.pyplot as plt
+import itertools
 
 
 def upload_args(file_path="config.json"):
@@ -16,6 +19,7 @@ def upload_args(file_path="config.json"):
     parser.add_argument("--save_model", required=False, type=bool, default=False, help="Boolean flag: set it if you want to save the model")
     parser.add_argument("--input_size", required=False, type=int, help="Input size of a singular time sample")
     parser.add_argument("--hidden_size", required=False, type=int)
+    parser.add_argument("--train_only", required=False, type=bool, help="If True, apply only train. The Test score is evaluated at the end of the training. Otherwise, apply train and evaluation")
     parser.add_argument("--num_layers", required=False, type=int)
     parser.add_argument("--sequence_length", required=False, type=int)
     parser.add_argument("--lr", required=False, type=float)
@@ -186,6 +190,39 @@ def load_existing_model(model, optimizer, checkpoint_path):
         max_test_f1_score = 0
         epoch = 0
     return max_test_f1_score, epoch
+
+
+def save_confusion_matrix(y_true: np.array, y_pred: np.array, classes: list, name_method: str):
+    cm = confusion_matrix(y_true=y_true, y_pred=y_pred)
+    micro_f1 = f1_score(y_true=y_true, y_pred=y_pred, average="micro")
+    plot_confusion_matrix(cm, classes, title=str.upper(name_method)+f", micro F1-score: {micro_f1:.3f}")
+    plt.savefig(name_method+"confusion_mat.png")
+
+
+def plot_confusion_matrix(cm, classes, normalize=True, title='Confusion matrix', cmap=plt.cm.Blues):
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        print("Normalized confusion matrix")
+    else:
+        print('Confusion matrix, without normalization')
+
+    print(cm)
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+
+    fmt = '.2f' if normalize else 'd'
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, format(cm[i, j], fmt), horizontalalignment="center", color="white" if cm[i, j] > thresh else "black")
+
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+
 
 
 if __name__ == '__main__':
