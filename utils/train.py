@@ -1,5 +1,6 @@
 import torch
 from torch.utils.data import DataLoader, random_split
+from torch.optim.lr_scheduler import StepLR
 from utils.dataset import MarkersDataset
 from utils.utils import load_existing_model, save_confusion_matrix
 from model.simple_lstm import *
@@ -253,6 +254,7 @@ def only_train_model(model, optimizer, train_dataloader, args, coord_cols, alpha
     if getattr(args, "device", "cpu") is not "cpu":
         wandb.init(project="mouse_project", entity="vittoriop", name=args.name, config=args.__dict__)
         wandb.watch(model)
+    scheduler = StepLR(optimizer, step_size=10, gamma=0.1)
     n_epochs = getattr(args, 'n_epochs')
     model.train()
     classification_criterion = nn.NLLLoss(weight=torch.tensor([0.9, 0.1])).to(args.device)  # nn.MSELoss().to(args.device)
@@ -301,7 +303,7 @@ def only_train_model(model, optimizer, train_dataloader, args, coord_cols, alpha
             else:
                 multi_task_loss = classification_loss
             multi_task_loss.backward()
-            optimizer.step()
+            scheduler.step()
             train_batch_classification_losses.append(classification_loss.item())
             # Collapse predictions by frame id (remember: same frame may be in several sequences --> then, collapse)
             train_frame_pred_accumulator = collapse_predictions(pred_behaviors, batch_frame_ids, train_frame_pred_accumulator)
