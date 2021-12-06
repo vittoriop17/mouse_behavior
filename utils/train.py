@@ -14,43 +14,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-# TODO - plot center movement (in function of time)
-
-def behavior_line(checkpoint_path, args):
-    """
-    Plot a histogram representing the behavior for each frame
-    """
-    setattr(args, "stride", 1)
-    setattr(args, "device", "cuda" if torch.cuda.is_available() else "cpu")
-    model = new_lstm.Net_w_conv(args) if args.with_conv else new_lstm.Net(args)
-    checkpoint = torch.load(checkpoint_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model = model.to(args.device)
-    test_dataset = MarkersDataset(args, train=False)
-    test_dl = DataLoader(test_dataset, batch_size=64)
-    all_predictions = np.zeros((test_dataset.dataset.shape[0], args.n_behaviors))
-    test_true_behaviors = test_dataset.get_all_classes()
-    for (batch_frame_ids, batch_sequences, batch_classes) in test_dl:
-        (batch_frame_ids, batch_sequences, batch_behaviors) = \
-            (batch_frame_ids.to(args.device), batch_sequences.to(args.device), batch_classes.to(args.device))
-        pred_behaviors, _ = model(batch_sequences)
-        # Collapse predictions by frame id (remember: same frame may be in several sequences --> then, collapse)
-        all_predictions = collapse_predictions(pred_behaviors, batch_frame_ids, all_predictions)
-    all_predictions = all_predictions.argmax(axis=-1)
-
-    y = np.array([1] * all_predictions.shape[0])
-    values = np.arange(0, all_predictions.shape[0])
-    bins_groom = all_predictions == 0
-    bins_non_groom = all_predictions != 0
-    plt.scatter(y=y[bins_groom], x=values[bins_groom], color='blue', alpha=.7, label="Grooming", s=5)
-    plt.scatter(y=y[bins_non_groom], x=values[bins_non_groom], color="red", alpha=.7, label='non grooming', s=5)
-
-    plt.show()
-    plt.savefig("prova.png")
-    bins_groom = values[bins_groom] / 50
-    print(bins_groom)
-
-
 
 def test_model(checkpoint_path, args):
     setattr(args, "stride", 1)
@@ -79,6 +42,7 @@ def test_model(checkpoint_path, args):
           f"\tGrooming/non-grooming f1 scores: {test_f1_score_by_class}")
     save_confusion_matrix(y_true=test_true_behaviors, y_pred=all_predictions,
                           classes=['grooming', 'non-grooming'], name_method="LSTM-based architecture")
+    np.savetxt("test_predictions.txt", all_predictions, delimiter='\n')
 
 
 def train_test_dataloader(args):

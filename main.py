@@ -85,4 +85,4 @@ if __name__ == '__main__':
     # setattr(args, "device", "cpu")
     # setattr(args, "name", "prova")
     # checkpoint_path = "data\\CHECKPOINTS\\seq_length\\checkpoint_Evaluation_seq_length_200.pt"
-    train.behavior_line(args.checkpoint_path, args)
+    train.test_model(args.checkpoint_path, args)
