@@ -35,9 +35,11 @@ def test_model(checkpoint_path, args):
         all_predictions = collapse_predictions(pred_behaviors, batch_frame_ids, all_predictions)
     all_predictions = all_predictions.argmax(axis=-1)
     test_f1_score_by_class = f1_score(test_true_behaviors, all_predictions, average=None)
-    micro_test_f1_score = f1_score(test_true_behaviors, all_predictions, average="micro")
+    test_f1_score_lab0 = f1_score(test_true_behaviors, all_predictions, pos_label=0, average='binary')
+    test_f1_score_lab1 = f1_score(test_true_behaviors, all_predictions, pos_label=1, average='binary')
     print(f"TEST RESULTS: \n"
-          f"\tMicro f1 score: {micro_test_f1_score}\n"
+          f"\tf1 score (label 0): {test_f1_score_lab0}\n"
+          f"\tf1 score (label 1): {test_f1_score_lab1}\n"
           f"\tGrooming/non-grooming f1 scores: {test_f1_score_by_class}")
     save_confusion_matrix(y_true=test_true_behaviors, y_pred=all_predictions,
                           classes=['grooming', 'non-grooming'], name_method="LSTM-based architecture")

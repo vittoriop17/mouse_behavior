@@ -79,6 +79,10 @@ def main(params):
 
 if __name__ == '__main__':
     args = utils.upload_args()
-    main(args)
+    # main(args)
     # checkpoint_path = "data\\checkpoint.pt"
     # train.denoise_trajectories_from_checkpoint(checkpoint_path, args)
+    # setattr(args, "device", "cpu")
+    # setattr(args, "name", "prova")
+    # checkpoint_path = "data\\CHECKPOINTS\\seq_length\\checkpoint_Evaluation_seq_length_200.pt"
+    train.test_model(args.checkpoint_path, args)

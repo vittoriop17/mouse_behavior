@@ -12,7 +12,7 @@ import itertools
 
 def upload_args(file_path="config.json"):
     parser = argparse.ArgumentParser(description=f'Arguments from json')
-    parser.add_argument("--name", required=True, type=str, help="Name of the experiment "
+    parser.add_argument("--name", required=False, type=str, help="Name of the experiment "
                                                                 "(e.g.: 'evaluate preprocessing: recenter_wrt_frame' or"
                                                                 " 'test sequence length: 300')")
     parser.add_argument("--n_epochs", required=False, type=int, help="Number of epochs")
@@ -224,6 +224,47 @@ def plot_confusion_matrix(cm, classes, normalize=True, title='Confusion matrix',
     plt.xlabel('Predicted label')
 
 
+def get_checkpoint_data(checkpoint_path):
+    checkpoint = None
+    try:
+        checkpoint = torch.load(checkpoint_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
+    except Exception as e:
+        print(f"Something happened during loading the checkpoint: {e}")
+    return checkpoint
+
+
+def plot_losses_by_epoch(values: np.array, name, loss_type, **kwargs):
+    epoch = np.arange(1, values.shape[0])
+    plt.gca().plot(epoch, values, kwargs)
+    plt.xlabel("Epoch")
+    plt.ylabel(loss_type)
+    plt.title(name)
+    plt.show()
+    plt.grid(True)
+
+
+def multiple_model_losses(checkpoint_paths: list, title, test_only=True, start=0):
+    colors = ['r', 'b', 'y', 'c', 'g', 'm', 'orange', "lightblue"]
+    epochs = 100
+    plt.figure()
+    for idx, checkpoint_path in enumerate(checkpoint_paths):
+        checkpoint = get_checkpoint_data(checkpoint_path)
+        test_micro_f1_score = checkpoint['all_test_f1_scores']
+        name = checkpoint['args'].name
+        name = ' '.join([token for idx, token in enumerate(name.split("_")) if idx > 0])
+        color = colors[idx]
+        if not test_only:
+            train_micro_f1_score = checkpoint['all_train_f1_scores']
+            plt.gca().plot(np.arange(1, epochs+1)[start:], train_micro_f1_score[start:], alpha=.5, color=color, label="TRAIN_SET: "+name, linestyle="--")
+        plt.gca().plot(np.arange(1, epochs+1)[start:], test_micro_f1_score[start:], alpha=.5, color=color, label="EVALUATION_SET: "+name)
+    plt.xlabel("Epoch")
+    plt.ylabel("Micro F1 score")
+    # title = "Pre-process techniques comparison. Metric: micro F1 score for train and evaluation sets"
+    plt.title(title)
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
 
 if __name__ == '__main__':
     file_path = "..\\data\\DLC_resnet101_groomOct29shuffle1_117500-snapshot-117500.h5"
@@ -232,4 +273,18 @@ if __name__ == '__main__':
     # frames = get_frames_from_video(video_path=video_path)
     # save_frames(root_path=, frames=frames)
     # save_frames_from_video(video_path, root_path)
-    save_ith_frames_from_video(video_name=video_path, root_path=root_path, frame_seq=10721 * 2)
+    # save_ith_frames_from_video(video_name=video_path, root_path=root_path, frame_seq=10721 * 2)
+    # check_paths = ["..\\data\\CHECKPOINTS\\checkpoint_Evaluation_preprocess_recenter_by_sequence.pt",
+    #                "..\\data\\CHECKPOINTS\\checkpoint_Evaluation_preprocess_recenter_by_frame.pt",
+    #                "..\\data\\CHECKPOINTS\\checkpoint_Evaluation_preprocess_normalization.pt"]
+    # multiple_model_losses(check_paths, title="Pre-process techniques comparison. Metric: micro F1 score for evaluation set")
+    # plt.tight_layout()
+    # plt.savefig("Preprocess_losses.png")
+
+    seq_lengths = [50, 100, 150, 200, 250, 300, 350, 400]
+    check_paths = ["..\\data\\CHECKPOINTS\\seq_length\\checkpoint_Evaluation_seq_length_"+str(seq_length)+".pt"
+                   for seq_length in seq_lengths]
+
+    multiple_model_losses(check_paths, title="Sequence length comparison. Metric: micro F1 score for evaluation set. \n From 50th to 100th epoch", start=49)
+    plt.tight_layout()
+    plt.savefig("seq_length_evaluation_losses.png")
