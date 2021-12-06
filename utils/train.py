@@ -14,6 +14,52 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
+# TODO - plot center movement (in function of time)
+
+def behavior_line(checkpoint_path, args):
+    """
+    Plot a histogram representing the behavior for each frame
+    """
+    setattr(args, "stride", 1)
+    setattr(args, "device", "cuda" if torch.cuda.is_available() else "cpu")
+    model = new_lstm.Net_w_conv(args) if args.with_conv else new_lstm.Net(args)
+    checkpoint = torch.load(checkpoint_path, map_location="cuda" if torch.cuda.is_available() else "cpu")
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model = model.to(args.device)
+    test_dataset = MarkersDataset(args, train=False)
+    test_dl = DataLoader(test_dataset, batch_size=64)
+    all_predictions = np.zeros((test_dataset.dataset.shape[0], args.n_behaviors))
+    test_true_behaviors = test_dataset.get_all_classes()
+    for (batch_frame_ids, batch_sequences, batch_classes) in test_dl:
+        (batch_frame_ids, batch_sequences, batch_behaviors) = \
+            (batch_frame_ids.to(args.device), batch_sequences.to(args.device), batch_classes.to(args.device))
+        pred_behaviors, _ = model(batch_sequences)
+        # Collapse predictions by frame id (remember: same frame may be in several sequences --> then, collapse)
+        all_predictions = collapse_predictions(pred_behaviors, batch_frame_ids, all_predictions)
+    all_predictions = all_predictions.argmax(axis=-1)
+
+    all_predictions = all_predictions[:500]
+    y = np.array([1] * all_predictions.shape[0])
+    values = np.arange(0, all_predictions.shape[0])
+    bins_groom = all_predictions == 0
+    bins_non_groom = all_predictions != 0
+    # plt.scatter(y=y[bins_non_groom], x=values[bins_non_groom], color="red", alpha=.7, label='non grooming', s=1)
+    # plt.scatter(y=y[bins_groom], x=values[bins_groom], color='green', alpha=1, label="Grooming", s=2, marker='x')
+
+    # plt.show()
+    # plt.savefig("prova.png")
+    bins_groom = values[bins_groom]
+    base_length = 1
+    all_lengths = []
+    for i in range(1, bins_groom.shape[0]):
+        if bins_groom[i-1] == (bins_groom[i] - 1):
+            base_length += 1
+        else:
+            all_lengths.append(base_length)
+            base_length = 1
+    all_lengths = np.array(all_lengths)
+    np.savetxt("grooming_sequences_length", np.unique(all_lengths, return_counts=True), delimiter='\n')
+
 
 def test_model(checkpoint_path, args):
     setattr(args, "stride", 1)
