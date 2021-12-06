@@ -46,7 +46,7 @@ def behavior_line(checkpoint_path, args):
     plt.hist(x[bins_non_groom], bins=values[bins_non_groom], color="red", alpha=.7, label='non grooming')
     plt.show()
     plt.savefig("prova.png")
-    bins_groom = bins_groom / 50
+    bins_groom = values[bins_groom] / 50
     print(bins_groom)
 
 
