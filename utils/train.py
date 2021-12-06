@@ -58,8 +58,10 @@ def behavior_line(checkpoint_path, args):
             all_lengths.append(base_length)
             base_length = 1
     all_lengths = np.array(all_lengths)
-    np.savetxt("grooming_sequences_length", np.unique(all_lengths, return_counts=True), delimiter='\n')
-
+    values, occ = np.unique(all_lengths, return_counts=True)
+    f = open("prova.txt", "w")
+    f.write(list(map(lambda x: f"{x[0]}; {x[1]}", np.vstack((values, occ)).T)))
+    f.close()
 
 def test_model(checkpoint_path, args):
     setattr(args, "stride", 1)
