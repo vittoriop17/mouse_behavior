@@ -195,7 +195,7 @@ def load_existing_model(model, optimizer, checkpoint_path):
 def save_confusion_matrix(y_true: np.array, y_pred: np.array, classes: list, name_method: str):
     cm = confusion_matrix(y_true=y_true, y_pred=y_pred)
     micro_f1 = f1_score(y_true=y_true, y_pred=y_pred, average="micro")
-    plot_confusion_matrix(cm, classes, title=str.upper(name_method)+f", micro F1-score: {micro_f1:.3f}")
+    plot_confusion_matrix(cm, classes, title=str.upper(name_method)+f", micro F1-score: {micro_f1:.3f}", normalize=False)
     plt.savefig(name_method+"confusion_mat.png")
 
 
