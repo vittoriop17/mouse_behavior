@@ -42,8 +42,9 @@ def behavior_line(checkpoint_path, args):
     values = np.arange(0, all_predictions.shape[0])
     bins_groom = all_predictions == 0
     bins_non_groom = all_predictions != 0
-    plt.hist(x[bins_groom], bins=values[bins_groom], color='blue', alpha=.7, label="Grooming")
-    plt.hist(x[bins_non_groom], bins=values[bins_non_groom], color="red", alpha=.7, label='non grooming')
+    plt.scatter(x[bins_groom], bins=values[bins_groom], color='blue', alpha=.7, label="Grooming", s=5)
+    plt.scatter(x[bins_non_groom], bins=values[bins_non_groom], color="red", alpha=.7, label='non grooming', s=5)
+
     plt.show()
     plt.savefig("prova.png")
     bins_groom = values[bins_groom] / 50
