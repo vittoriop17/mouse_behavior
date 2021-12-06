@@ -10,7 +10,7 @@
   "batch_size": 64,
   "n_epochs": 100,
   "train_dataset_path": "D:\\UNIVERSITA\\KTH\\Semestre 1\\Project Course in Data Science\\CODE\\data\\trajectories_with_behavior\\test_dataset.csv",
-  "test_dataset_path": "D:\\UNIVERSITA\\KTH\\Semestre 1\\Project Course in Data Science\\CODE\\data\\trajectories_with_behavior\\test_dataset.csv",
+  "test_dataset_path": "D:\\UNIVERSITA\\KTH\\Semestre 1\\Project Course in Data Science\\CODE_NEW\\mouse_behavior\\data\\trajectories_with_behavior\\trajectories_22min_right_w_behaviors.csv",
   "n_behaviors": 2,
   "n_markers": 8,
   "dropout": 0.3,
@@ -21,5 +21,6 @@
   "preprocess": "None",
   "multitask": "False",
   "name": "prova",
-  "train_only": "False"
+  "train_only": "False",
+  "checkpoint_path": "D:\\UNIVERSITA\\KTH\\Semestre 1\\Project Course in Data Science\\CODE_NEW\\mouse_behavior\\data\\CHECKPOINTS\\checkpoint_Test_seq_length_200.pt"
 }
