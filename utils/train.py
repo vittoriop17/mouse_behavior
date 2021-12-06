@@ -60,7 +60,7 @@ def behavior_line(checkpoint_path, args):
     all_lengths = np.array(all_lengths)
     values, occ = np.unique(all_lengths, return_counts=True)
     f = open("prova.txt", "w")
-    f.write(list(map(lambda x: f"{x[0]}; {x[1]}", np.vstack((values, occ)).T)))
+    f.write(str(list(map(lambda x: f"{x[0]}; {x[1]}", np.vstack((values, occ)).T))))
     f.close()
 
 def test_model(checkpoint_path, args):
