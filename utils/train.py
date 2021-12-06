@@ -38,12 +38,12 @@ def behavior_line(checkpoint_path, args):
         all_predictions = collapse_predictions(pred_behaviors, batch_frame_ids, all_predictions)
     all_predictions = all_predictions.argmax(axis=-1)
 
-    x = np.array([1] * all_predictions.shape[0])
+    y = np.array([1] * all_predictions.shape[0])
     values = np.arange(0, all_predictions.shape[0])
     bins_groom = all_predictions == 0
     bins_non_groom = all_predictions != 0
-    plt.scatter(x[bins_groom], bins=values[bins_groom], color='blue', alpha=.7, label="Grooming", s=5)
-    plt.scatter(x[bins_non_groom], bins=values[bins_non_groom], color="red", alpha=.7, label='non grooming', s=5)
+    plt.scatter(y=y[bins_groom], x=values[bins_groom], color='blue', alpha=.7, label="Grooming", s=5)
+    plt.scatter(y=y[bins_non_groom], x=values[bins_non_groom], color="red", alpha=.7, label='non grooming', s=5)
 
     plt.show()
     plt.savefig("prova.png")
