@@ -7,12 +7,11 @@ from model.simple_lstm import *
 import time
 import numpy as np
 from model import new_lstm
-from sklearn.metrics import f1_score, confusion_matrix
+from sklearn.metrics import f1_score, confusion_matrix, precision_recall_fscore_support
 from utils.loss import weighted_mse
 import wandb
 import pandas as pd
 import matplotlib.pyplot as plt
-
 
 
 def behavior_line(checkpoint_path, args):
@@ -62,6 +61,7 @@ def behavior_line(checkpoint_path, args):
     f.write(str(list(map(lambda x: f"{x[0]}; {x[1]}", np.vstack((values, occ)).T))))
     f.close()
 
+
 def test_model(checkpoint_path, args):
     setattr(args, "stride", 1)
     setattr(args, "device", "cuda" if torch.cuda.is_available() else "cpu")
@@ -81,12 +81,11 @@ def test_model(checkpoint_path, args):
         all_predictions = collapse_predictions(pred_behaviors, batch_frame_ids, all_predictions)
     all_predictions = all_predictions.argmax(axis=-1)
     test_f1_score_by_class = f1_score(test_true_behaviors, all_predictions, average=None)
-    test_f1_score_lab0 = f1_score(test_true_behaviors, all_predictions, pos_label=0, average='binary')
-    test_f1_score_lab1 = f1_score(test_true_behaviors, all_predictions, pos_label=1, average='binary')
+    prfs_grooming = precision_recall_fscore_support(test_true_behaviors, all_predictions, pos_label=0, average='binary')
+    prfs_non_grooming = precision_recall_fscore_support(test_true_behaviors, all_predictions, pos_label=1, average='binary')
     print(f"TEST RESULTS: \n"
-          f"\tf1 score (label 0): {test_f1_score_lab0}\n"
-          f"\tf1 score (label 1): {test_f1_score_lab1}\n"
-          f"\tGrooming/non-grooming f1 scores: {test_f1_score_by_class}")
+          f"\tGrooming precision,recall,fscore,support: {prfs_grooming}"
+          f"\tNon-grooming precision,recall,fscore,support: {prfs_non_grooming}")
     save_confusion_matrix(y_true=test_true_behaviors, y_pred=all_predictions,
                           classes=['grooming', 'non-grooming'], name_method="LSTM-based architecture")
     np.savetxt("test_predictions.txt", all_predictions, delimiter='\n')
