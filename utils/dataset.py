@@ -10,6 +10,23 @@ import cv2
 import utils
 
 
+def save_frame_w_markers_and_center(video_path, trajectories_path, idx=None):
+    trajectories = pd.read_csv(trajectories_path)
+    if idx is None:
+        idx = np.random.randint(0, trajectories.shape[0])
+    # the following is meaningful only if (x, y) coordinates associated to a distinct marker are sequentially reported
+    # inside the csv file (trajectories_path)
+    coords = [val for col, val in zip(trajectories.columns, trajectories.loc[idx]) if col.startswith("x_") or col.startswith("y_")]
+    coords = np.reshape(coords, (-1, 2))
+    center = np.sum(coords, axis=0) / coords.shape[0]
+    coords = np.vstack((coords, center))
+    coords = np.reshape(coords, (1, -1))
+    frame = utils.get_ith_frame_from_video(video_path, idx)
+    frame = np.expand_dims(frame, axis=0)
+    frame = utils.print_dots_on_frames(frame, coords)
+    utils.save_frame(np.squeeze(frame, axis=0), ".\\frame_with_markers_and_center.png")
+
+
 def check_start_end(start_end, n_frames):
     flags = None
     for idx, (start, end) in enumerate(start_end):
@@ -98,7 +115,7 @@ def merge_behavior_and_trajectories(file_behavior,
         if save_custom_frames and os.path.exists(frames_path):
             # save only two frames (the first and the last one associated to the behavior)
             for frame_number in [start_frame, end_frame]:
-                utils.save_ith_frames_from_video(video_name=video_path, root_path=frames_path, frame_seq=frame_number)
+                utils.save_ith_frame_from_video(video_name=video_path, root_path=frames_path, frame_seq=frame_number)
                 frame_path = os.path.join(frames_path, f"{frame_number}.png")
                 img = cv2.imread(frame_path)
                 # write dot on top of img
@@ -380,4 +397,5 @@ if __name__ == '__main__':
     # df_test.label[df_test.label == 2] = 1
     # df_train.to_csv(path_or_buf=train_path, header=df_train.columns, index=False)
     # df_test.to_csv(path_or_buf=test_path, header=df_test.columns, index=False)
-    #
+    video_path = "..\\..\\..\\ALL_VIDEOSSSS\\S1170001.MP4"
+    save_frame_w_markers_and_center(video_path, file_trajectories, 500)

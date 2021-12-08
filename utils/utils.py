@@ -16,6 +16,7 @@ def upload_args(file_path="config.json"):
                                                                 "(e.g.: 'evaluate preprocessing: recenter_wrt_frame' or"
                                                                 " 'test sequence length: 300')")
     parser.add_argument("--n_epochs", required=False, type=int, help="Number of epochs")
+    parser.add_argument("--test_only", required=False, type=bool, help="Specify if only test is required")
     parser.add_argument("--save_model", required=False, type=bool, default=False, help="Boolean flag: set it if you want to save the model")
     parser.add_argument("--input_size", required=False, type=int, help="Input size of a singular time sample")
     parser.add_argument("--hidden_size", required=False, type=int)
@@ -112,15 +113,23 @@ def save_frames_from_video(video_path: str, root_path, skip_n_frames=0, idx=None
             count += 1
 
 
-def save_ith_frames_from_video(video_name: str, root_path, frame_seq):
+def save_ith_frame_from_video(video_name: str, root_path, frame_seq):
     # Open the video file
-    cap = cv2.VideoCapture(video_name)
-    cap.set(1, frame_seq)
-    # Read the next frame from the video
-    ret, frame = cap.read()
+    frame = get_ith_frame_from_video(video_name, frame_seq)
     frame_path = os.path.join(root_path, f"{frame_seq}.png")
     cv2.imwrite(frame_path, frame, [cv2.IMWRITE_PNG_COMPRESSION, 9])
 
+
+def get_ith_frame_from_video(video_path, frame_id):
+    # Open the video file
+    cap = cv2.VideoCapture(video_path)
+    cap.set(1, frame_id)
+    # Read the next frame from the video
+    ret, frame = cap.read()
+    return frame
+
+def save_frame(frame, path):
+    cv2.imwrite(path, frame, [cv2.IMWRITE_PNG_COMPRESSION, 9])
 
 def print_dots_on_frames(frames, coords: np.array, RGB=(0, 0, 255), radius=5, thickness=5):
     """

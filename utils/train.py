@@ -14,7 +14,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 
-# TODO - plot center movement (in function of time)
 
 def behavior_line(checkpoint_path, args):
     """
