@@ -203,8 +203,8 @@ def load_existing_model(model, optimizer, checkpoint_path):
 
 def save_confusion_matrix(y_true: np.array, y_pred: np.array, classes: list, name_method: str):
     cm = confusion_matrix(y_true=y_true, y_pred=y_pred)
-    micro_f1 = f1_score(y_true=y_true, y_pred=y_pred, average="micro")
-    plot_confusion_matrix(cm, classes, title=str.upper(name_method)+f", micro F1-score: {micro_f1:.3f}", normalize=False)
+    micro_f1 = f1_score(y_true=y_true, y_pred=y_pred, average=None)
+    plot_confusion_matrix(cm, classes, title=str.upper(name_method)+f", F1-score (G, NG): {micro_f1[0]:.3f}, {micro_f1[1]:.3f}", normalize=False)
     plt.savefig(name_method+"confusion_mat.png")
 
 
@@ -275,6 +275,59 @@ def multiple_model_losses(checkpoint_paths: list, title, test_only=True, start=0
     plt.show()
 
 
+def from_seconds_to_hh_mm_ss(seconds):
+    mm_ss = divmod(seconds, 60)
+    mm, ss = mm_ss[0], mm_ss[1]
+    hh_mm = divmod(mm, 60)
+    hh = hh_mm[0]
+    mm = hh_mm[1]
+    return f"{str(hh).zfill(2)}:{str(mm).zfill(2)}:{str(ss).zfill(2)}"
+
+
+def get_grooming_time_from_predictions(file_path, fps=50):
+    preds = np.loadtxt(file_path, delimiter='\n', dtype=np.int32)
+    grooming_frames = np.argwhere(preds == 0)
+    grooming_set_seconds = set()
+    grooming_set_seconds.update((set([int(np.round(frame/fps)) for frame in grooming_frames])))
+    grooming_list_seconds = sorted(list(grooming_set_seconds))
+    grooming_intervals, flag_interval_closed, start_interval = dict(), False, grooming_list_seconds[0]
+    for idx in range(1, len(grooming_list_seconds) - 1):
+        previous = grooming_list_seconds[idx - 1]
+        current = grooming_list_seconds[idx]
+        next_g = grooming_list_seconds[idx + 1]
+        if flag_interval_closed:
+            start_interval = current
+            flag_interval_closed = False
+        elif (previous + 1) == current == (next_g - 1):
+            continue
+        elif current != (next_g - 1):
+            grooming_intervals[start_interval] = current  # key: value -> start_interval: close_interval
+            flag_interval_closed = True
+        elif (previous + 1) != current:
+            grooming_intervals[start_interval] = start_interval
+            flag_interval_closed = True
+
+    grooming_set_hh_mm_ss = list()
+    grooming_set_hh_mm_ss.extend([[from_seconds_to_hh_mm_ss(start), from_seconds_to_hh_mm_ss(end)]
+                                  for start, end in grooming_intervals.items()])
+    list(map(lambda x: print(f"Grooming detected from {x[0]} to {x[1]} (hh:mm:ss format)"), grooming_set_hh_mm_ss))
+
+    return grooming_set_seconds, grooming_intervals
+
+
+def create_bash_files_for_predictions(root_path, video_path):
+    predictions_path = "..\\data\\frame_predictions.txt"
+    _, pred_grooming_intervals = get_grooming_time_from_predictions(predictions_path)
+    # ground_truth_path = ""
+    # _, true_grooming_intervals = get_grooming_time_from_predictions(ground_truth_path)
+    for start, end in pred_grooming_intervals.items():
+        file_name = os.path.join(root_path, "predictions", f"time_interval__{start}_{end}.sh")
+        with open(file_name, "w") as fp:
+            lines = "#!/bin/bash\n"\
+                    f"vlc --start-time={start} --stop-time={end} '{video_path}'"
+            fp.writelines(lines)
+
+
 if __name__ == '__main__':
     file_path = "..\\data\\DLC_resnet101_groomOct29shuffle1_117500-snapshot-117500.h5"
     video_path = "..\\..\\ALL_VIDEOSSSS\\final\\front_57min.MP4"
@@ -289,11 +342,11 @@ if __name__ == '__main__':
     # multiple_model_losses(check_paths, title="Pre-process techniques comparison. Metric: micro F1 score for evaluation set")
     # plt.tight_layout()
     # plt.savefig("Preprocess_losses.png")
-
-    seq_lengths = [50, 100, 150, 200, 250, 300, 350, 400]
-    check_paths = ["..\\data\\CHECKPOINTS\\seq_length\\checkpoint_Evaluation_seq_length_"+str(seq_length)+".pt"
-                   for seq_length in seq_lengths]
-
-    multiple_model_losses(check_paths, title="Sequence length comparison. Metric: micro F1 score for evaluation set. \n From 50th to 100th epoch", start=49)
-    plt.tight_layout()
-    plt.savefig("seq_length_evaluation_losses.png")
+    # seq_lengths = [50, 100, 150, 200, 250, 300, 350, 400]
+    # check_paths = ["..\\data\\CHECKPOINTS\\seq_length\\checkpoint_Evaluation_seq_length_"+str(seq_length)+".pt"
+    #                for seq_length in seq_lengths]
+    #
+    # multiple_model_losses(check_paths, title="Sequence length comparison. Metric: micro F1 score for evaluation set. \n From 50th to 100th epoch", start=49)
+    # plt.tight_layout()
+    # plt.savefig("seq_length_evaluation_losses.png")
+    create_bash_files_for_predictions(root_path="..\\visual_analysis", video_path="..\\S1170001.MP4")

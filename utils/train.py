@@ -80,12 +80,13 @@ def test_model(checkpoint_path, args):
         # Collapse predictions by frame id (remember: same frame may be in several sequences --> then, collapse)
         all_predictions = collapse_predictions(pred_behaviors, batch_frame_ids, all_predictions)
     all_predictions = all_predictions.argmax(axis=-1)
-    test_f1_score_by_class = f1_score(test_true_behaviors, all_predictions, average=None)
+    weighted_avg_f1_score = f1_score(test_true_behaviors, all_predictions, average="weighted")
     prfs_grooming = precision_recall_fscore_support(test_true_behaviors, all_predictions, pos_label=0, average='binary')
     prfs_non_grooming = precision_recall_fscore_support(test_true_behaviors, all_predictions, pos_label=1, average='binary')
     print(f"TEST RESULTS: \n"
           f"\tGrooming precision,recall,fscore,support: {prfs_grooming}"
-          f"\tNon-grooming precision,recall,fscore,support: {prfs_non_grooming}")
+          f"\tNon-grooming precision,recall,fscore,support: {prfs_non_grooming}"
+          f"\tWeighted avg F1 score: {weighted_avg_f1_score}")
     save_confusion_matrix(y_true=test_true_behaviors, y_pred=all_predictions,
                           classes=['grooming', 'non-grooming'], name_method="LSTM-based architecture")
     np.savetxt("test_predictions.txt", all_predictions, delimiter='\n')
